@@ -585,21 +585,24 @@ const OrderEntry = () => {
           <Link
             target="_blank"
             href={`/dashboard/${record.invoiceNo}`}
-            passHref>
+            passHref
+          >
             <p
               style={{
                 color: "#1890ff",
                 cursor: "pointer",
                 marginRight: 8,
                 fontWeight: 500,
-              }}>
+              }}
+            >
               {invoiceNo}
             </p>
           </Link>
           <Tooltip title="Click to copy">
             <CopyToClipboard
               text={invoiceNo}
-              onCopy={() => message.success("Copied!")}>
+              onCopy={() => message.success("Copied!")}
+            >
               <CopyOutlined style={{ cursor: "pointer", color: "#1890ff" }} />
             </CopyToClipboard>
           </Tooltip>
@@ -612,13 +615,14 @@ const OrderEntry = () => {
       width: 120,
       // fixed: "left",
       render: (_, record) =>
-        userInfo.pagePermissions?.[2]?.insertAccess && (
+        userInfo.pagePermissions?.[1]?.insertAccess && (
           <Button
             type="primary"
             size="small"
             onClick={() => handleExpenseClick(record.invoiceNo, record._id)}
             disabled={record?.isExpenseAdded}
-            icon={<PlusOutlined />}>
+            icon={<PlusOutlined />}
+          >
             {record?.isExpenseAdded ? "Added" : "Expense"}
           </Button>
         ),
@@ -682,7 +686,8 @@ const OrderEntry = () => {
       width: 120,
       render: (text) => (
         <span
-          style={{ color: text > 0 ? "#ff4d4f" : "#52c41a", fontWeight: 500 }}>
+          style={{ color: text > 0 ? "#ff4d4f" : "#52c41a", fontWeight: 500 }}
+        >
           ৳{text}
         </span>
       ),
@@ -780,7 +785,8 @@ const OrderEntry = () => {
                   <Menu.Item
                     key="edit"
                     icon={<EditOutlined />}
-                    onClick={() => handleEdit(record)}>
+                    onClick={() => handleEdit(record)}
+                  >
                     Edit
                   </Menu.Item>
                 )}
@@ -788,7 +794,8 @@ const OrderEntry = () => {
                   <Menu.Item
                     key="updateStatus"
                     icon={<EditOutlined />}
-                    onClick={() => openStatusUpdateModal(record)}>
+                    onClick={() => openStatusUpdateModal(record)}
+                  >
                     Update Status
                   </Menu.Item>
                 )}
@@ -800,7 +807,8 @@ const OrderEntry = () => {
                   title="Are you sure you want to delete this order?"
                   onConfirm={() => handleDelete(record._id)}
                   okText="Yes"
-                  cancelText="No">
+                  cancelText="No"
+                >
                   Delete
                 </Popconfirm>
               </Menu.Item>
@@ -825,7 +833,8 @@ const OrderEntry = () => {
 
           <Card
             style={{ marginBottom: 20 }}
-            bodyStyle={{ padding: "16px 24px" }}>
+            bodyStyle={{ padding: "16px 24px" }}
+          >
             <div className="flex flex-wrap justify-between items-center gap-4">
               <div className="flex flex-wrap gap-4">
                 <Input.Search
@@ -844,7 +853,8 @@ const OrderEntry = () => {
                     placeholder="Filter by Status"
                     value={statusFilter}
                     onChange={(value) => setStatusFilter(value)}
-                    suffixIcon={<FilterOutlined />}>
+                    suffixIcon={<FilterOutlined />}
+                  >
                     <Option value={null}>All Status</Option>
                     <Option value="Pending">Pending</Option>
                     <Option value="On Process">On Process</Option>
@@ -867,7 +877,8 @@ const OrderEntry = () => {
                     onClick={exportToExcel}
                     icon={<ExportOutlined />}
                     loading={loading}
-                    disabled={loading}>
+                    disabled={loading}
+                  >
                     Export Last Month
                   </Button>
                 )}
@@ -887,7 +898,8 @@ const OrderEntry = () => {
                       setVisible(true);
                       setIsEditing(false);
                     }}
-                    icon={<PlusOutlined />}>
+                    icon={<PlusOutlined />}
+                  >
                     Add Order
                   </Button>
                 )}
@@ -935,7 +947,8 @@ const OrderEntry = () => {
               formik.setFieldValue("noteImageUrl", null);
             }}
             footer={null}
-            destroyOnClose>
+            destroyOnClose
+          >
             <OrderForm
               formik={formik}
               products={products}
@@ -965,7 +978,8 @@ const OrderEntry = () => {
               textAlign: "center",
               width: 400,
               boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-            }}>
+            }}
+          >
             <div style={{ fontSize: 24, fontWeight: 600, color: "#ff4d4f" }}>
               Access Denied
             </div>

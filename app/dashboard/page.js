@@ -44,6 +44,8 @@ import InventoryPage from "@/component/InventoryPage";
 import AgentInformation from "@/component/AgentInformation";
 import CategoryPage from "@/component/CategoryPage";
 import coreAxios from "@/utils/axiosInstance";
+import ExpenseInfo from "@/component/ExpenseInfo";
+import OrderEntry from "@/component/OrderEntry";
 
 const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
@@ -61,6 +63,11 @@ const rolePermissions = {
       icon: <ShoppingOutlined />,
     },
     {
+      key: "10",
+      label: "ক্যাটাগরি ",
+      icon: <UsergroupAddOutlined />,
+    },
+    {
       key: "7",
       label: "ইনভেন্টরি",
       icon: <InboxOutlined />,
@@ -73,11 +80,6 @@ const rolePermissions = {
     {
       key: "2",
       label: "ব্যবহারকারী",
-      icon: <UsergroupAddOutlined />,
-    },
-    {
-      key: "10",
-      label: "ক্যাটাগরি ",
       icon: <UsergroupAddOutlined />,
     },
   ],
@@ -304,9 +306,9 @@ const DashboardContent = ({ userInfo }) => {
       {/* Header with Refresh Button */}
       <div className="flex justify-between items-center">
         <div>
-          <Title level={2} className="text-gray-800 mb-2">
+          {/* <Title level={2} className="text-gray-800 mb-2">
             ড্যাশবোর্ড ওভারভিউ
-          </Title>
+          </Title> */}
           <Text className="text-gray-600">
             সিস্টেমের সামগ্রিক পরিসংখ্যান এবং কার্যক্রম
           </Text>
@@ -658,11 +660,11 @@ const Dashboard = () => {
       case "1":
         return <DashboardContent userInfo={userInfo} />;
       case "6":
-        return <OrderDashboard />;
+        return <OrderEntry />;
       case "7":
         return <InventoryPage />;
       case "9":
-        return <ExpenseManagement />;
+        return <ExpenseInfo />;
       case "2":
         return <AgentInformation />;
       case "10":

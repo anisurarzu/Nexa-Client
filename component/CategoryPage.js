@@ -304,7 +304,7 @@ const CategoryPage = () => {
       render: (text) => (text ? dayjs(text).format("DD/MM/YYYY") : "-"),
       sorter: (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
     },
-    ...(userInfo?.pagePermissions?.[0]?.editAccess === true
+    ...(userInfo?.pagePermissions?.[4]?.editAccess === true
       ? [
           {
             title: "কর্ম",
@@ -348,7 +348,7 @@ const CategoryPage = () => {
       : []),
   ];
 
-  if (userInfo?.pagePermissions?.[0]?.viewAccess !== true) {
+  if (userInfo?.pagePermissions?.[4]?.viewAccess !== true) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <Card className="text-center shadow-lg border-0 max-w-md">

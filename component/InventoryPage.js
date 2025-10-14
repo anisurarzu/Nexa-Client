@@ -24,6 +24,11 @@ import {
   Space,
   Tooltip,
   InputNumber,
+  Grid,
+  Drawer,
+  List,
+  Avatar,
+  Badge,
 } from "antd";
 import {
   EditOutlined,
@@ -37,6 +42,10 @@ import {
   ExclamationCircleOutlined,
   EyeOutlined,
   ReloadOutlined,
+  DollarOutlined,
+  FilterOutlined,
+  MenuOutlined,
+  CloseOutlined,
 } from "@ant-design/icons";
 import { useFormik } from "formik";
 import dayjs from "dayjs";
@@ -45,6 +54,7 @@ import coreAxios from "@/utils/axiosInstance";
 const { Option } = Select;
 const { TextArea } = Input;
 const { Dragger } = Upload;
+const { useBreakpoint } = Grid;
 
 const InventoryPage = () => {
   const [visible, setVisible] = useState(false);
@@ -63,7 +73,11 @@ const InventoryPage = () => {
     lowStock: 0,
     outOfStock: 0,
   });
+  const [filterDrawerVisible, setFilterDrawerVisible] = useState(false);
+  const [mobileView, setMobileView] = useState("list");
 
+  const screens = useBreakpoint();
+  const isMobile = !screens.md;
   const userInfo = JSON.parse(localStorage.getItem("userInfo"));
 
   // Fetch inventory items from API
@@ -137,6 +151,7 @@ const InventoryPage = () => {
       category: "",
       description: "",
       qty: 0,
+      unitPrice: 0,
       stockQTY: 0,
       purchaseBy: "",
       createdBy: userInfo?.loginID,
@@ -209,6 +224,7 @@ const InventoryPage = () => {
       category: record.category,
       description: record.description,
       qty: record.qty,
+      unitPrice: record.unitPrice,
       stockQTY: record.stockQTY,
       purchaseBy: record.purchaseBy,
       createdBy: userInfo?.loginID,
@@ -276,12 +292,126 @@ const InventoryPage = () => {
     return category ? category.categoryName : categoryValue;
   };
 
+  const formatPrice = (price) => {
+    return new Intl.NumberFormat("bn-BD", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(price || 0);
+  };
+
+  // Mobile Card View for Products
+  const renderMobileCard = (item) => {
+    const stockStatus = getStockStatus(item.qty);
+    return (
+      <Card
+        key={item.productId}
+        className="mb-3 shadow-sm hover:shadow-md transition-shadow"
+        bodyStyle={{ padding: "12px" }}
+      >
+        <div className="flex items-start gap-3">
+          <div className="flex-shrink-0">
+            <Image
+              src={
+                item.imageUrl
+                  ? `data:image/jpeg;base64,${item.imageUrl}`
+                  : "/placeholder/60/60"
+              }
+              alt="Product"
+              width={60}
+              height={60}
+              style={{
+                borderRadius: "8px",
+                objectFit: "cover",
+              }}
+              fallback="/placeholder/60/60"
+              preview={false}
+            />
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between mb-1">
+              <h3 className="font-semibold text-gray-800 text-sm truncate mr-2">
+                {item.productName}
+              </h3>
+              <Badge
+                color={stockStatus.color}
+                text={stockStatus.label}
+                size="small"
+              />
+            </div>
+
+            <div className="space-y-1 text-xs text-gray-600">
+              <div className="flex items-center gap-1">
+                <span className="font-medium">ক্যাটাগরি:</span>
+                <span>{getCategoryLabel(item.category)}</span>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <span className="font-medium">পরিমাণ:</span>
+                <span>{item.qty} পিস</span>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <DollarOutlined className="text-green-500 text-xs" />
+                <span className="font-medium">মূল্য:</span>
+                <span className="text-green-600 font-semibold">
+                  ৳{formatPrice(item.unitPrice)}
+                </span>
+              </div>
+
+              {item.purchaseBy && (
+                <div className="flex items-center gap-1">
+                  <span className="font-medium">ক্রয় করেছেন:</span>
+                  <span>{item.purchaseBy}</span>
+                </div>
+              )}
+            </div>
+
+            {userInfo?.pagePermissions?.[4]?.editAccess === true && (
+              <div className="flex gap-2 mt-2 pt-2 border-t border-gray-100">
+                <Button
+                  type="primary"
+                  size="small"
+                  icon={<EditOutlined />}
+                  onClick={() => handleEdit(item)}
+                  className="bg-blue-500 border-blue-500 text-xs flex-1"
+                >
+                  এডিট
+                </Button>
+                <Popconfirm
+                  title="আপনি কি এই পণ্য ডিলিট করতে চান?"
+                  description="এই কাজটি পূর্বাবস্থায় ফেরানো যাবে না!"
+                  onConfirm={() => handleDelete(item.productId)}
+                  okText="হ্যাঁ"
+                  cancelText="না"
+                  okType="danger"
+                  icon={<ExclamationCircleOutlined className="text-red-500" />}
+                >
+                  <Button
+                    type="primary"
+                    danger
+                    size="small"
+                    icon={<DeleteOutlined />}
+                    className="text-xs flex-1"
+                  >
+                    ডিলিট
+                  </Button>
+                </Popconfirm>
+              </div>
+            )}
+          </div>
+        </div>
+      </Card>
+    );
+  };
+
   const columns = [
     {
       title: "ছবি",
       dataIndex: "imageUrl",
       key: "imageUrl",
       width: 80,
+      responsive: ["md"],
       render: (imageUrl) => (
         <div className="flex justify-center">
           <Image
@@ -312,6 +442,7 @@ const InventoryPage = () => {
       title: "ক্যাটাগরি",
       dataIndex: "category",
       key: "category",
+      responsive: ["md"],
       render: (category) => {
         const categoryObj = categories.find(
           (cat) => cat.categoryCode === category
@@ -338,23 +469,41 @@ const InventoryPage = () => {
       ),
     },
     {
+      title: "ইউনিট মূল্য",
+      dataIndex: "unitPrice",
+      key: "unitPrice",
+      responsive: ["md"],
+      sorter: (a, b) => a.unitPrice - b.unitPrice,
+      render: (price) => (
+        <Space>
+          <DollarOutlined className="text-green-500" />
+          <span className="font-medium text-green-600">
+            ৳{formatPrice(price)}
+          </span>
+        </Space>
+      ),
+    },
+    {
       title: "ক্রয় করেছেন",
       dataIndex: "purchaseBy",
       key: "purchaseBy",
+      responsive: ["lg"],
     },
     {
       title: "তৈরির তারিখ",
       dataIndex: "createdDate",
       key: "createdDate",
+      responsive: ["lg"],
       render: (text) => (text ? dayjs(text).format("DD/MM/YYYY HH:mm") : "-"),
       sorter: (a, b) => new Date(a.createdDate) - new Date(b.createdDate),
     },
-    ...(userInfo?.pagePermissions?.[0]?.editAccess === true
+    ...(userInfo?.pagePermissions?.[4]?.editAccess === true
       ? [
           {
             title: "কর্ম",
             key: "actions",
             width: 120,
+            responsive: ["md"],
             render: (_, record) => (
               <Space size="small">
                 <Tooltip title="এডিট করুন">
@@ -393,10 +542,10 @@ const InventoryPage = () => {
       : []),
   ];
 
-  if (userInfo?.pagePermissions?.[0]?.viewAccess !== true) {
+  if (userInfo?.pagePermissions?.[4]?.viewAccess !== true) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Card className="text-center shadow-lg border-0 max-w-md">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <Card className="text-center shadow-lg border-0 w-full max-w-md">
           <ExclamationCircleOutlined className="text-6xl text-red-500 mb-4" />
           <h3 className="text-red-600 mb-2 text-xl font-bold">অনুমতি নেই</h3>
           <p className="text-gray-600">
@@ -408,191 +557,402 @@ const InventoryPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 lg:p-6">
+    <div className="min-h-screen bg-gray-50 p-3 lg:p-6">
       {/* Header Section */}
-      <div className="mb-6">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl lg:text-3xl font-bold text-gray-800 mb-2">
+      <div className="mb-4 lg:mb-6">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 lg:gap-4 mb-4 lg:mb-6">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl lg:text-3xl font-bold text-gray-800 mb-1 lg:mb-2 truncate">
               ইনভেন্টরি ব্যবস্থাপনা
             </h1>
-            <p className="text-gray-600">
+            <p className="text-gray-600 text-sm lg:text-base">
               আপনার ইলেকট্রনিক্স পণ্যগুলির স্টক ব্যবস্থাপনা করুন
             </p>
           </div>
 
-          <Space>
-            <Tooltip title="রিফ্রেশ করুন">
-              <Button
-                icon={<ReloadOutlined />}
-                onClick={refreshData}
-                size="large"
-                className="border-blue-500 text-blue-500"
-              >
-                রিফ্রেশ
-              </Button>
-            </Tooltip>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => {
-                formik.resetForm();
-                setVisible(true);
-                setIsEditing(false);
-                setFileList([]);
-                formik.setFieldValue("createdBy", userInfo?.loginID);
-              }}
-              className="bg-green-600 hover:bg-green-700 border-green-600 h-12 px-6 text-lg"
-              size="large"
-            >
-              নতুন পণ্য যোগ করুন
-            </Button>
+          <Space size="small" className="w-full lg:w-auto">
+            {isMobile && (
+              <div className="flex gap-2 w-full">
+                <Button
+                  icon={<FilterOutlined />}
+                  onClick={() => setFilterDrawerVisible(true)}
+                  size="large"
+                  className="flex-1 border-blue-500 text-blue-500"
+                >
+                  ফিল্টার
+                </Button>
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={refreshData}
+                  size="large"
+                  className="flex-1 border-green-500 text-green-500"
+                >
+                  রিফ্রেশ
+                </Button>
+              </div>
+            )}
+            {!isMobile && (
+              <>
+                <Tooltip title="রিফ্রেশ করুন">
+                  <Button
+                    icon={<ReloadOutlined />}
+                    onClick={refreshData}
+                    size="large"
+                    className="border-blue-500 text-blue-500"
+                  >
+                    রিফ্রেশ
+                  </Button>
+                </Tooltip>
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={() => {
+                    formik.resetForm();
+                    setVisible(true);
+                    setIsEditing(false);
+                    setFileList([]);
+                    formik.setFieldValue("createdBy", userInfo?.loginID);
+                  }}
+                  className="bg-green-600 hover:bg-green-700 border-green-600 h-12 px-4 lg:px-6 text-base lg:text-lg"
+                  size="large"
+                >
+                  {isMobile ? "যোগ করুন" : "নতুন পণ্য যোগ করুন"}
+                </Button>
+              </>
+            )}
           </Space>
         </div>
 
+        {/* Mobile Add Button */}
+        {isMobile && (
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => {
+              formik.resetForm();
+              setVisible(true);
+              setIsEditing(false);
+              setFileList([]);
+              formik.setFieldValue("createdBy", userInfo?.loginID);
+            }}
+            className="w-full bg-green-600 hover:bg-green-700 border-green-600 h-12 mb-4"
+            size="large"
+          >
+            নতুন পণ্য যোগ করুন
+          </Button>
+        )}
+
         {/* Statistics Cards */}
-        <Row gutter={[16, 16]} className="mb-6">
-          <Col xs={24} sm={8}>
-            <Card className="text-center shadow-md border-0 hover:shadow-lg transition-shadow">
+        <Row gutter={[12, 12]} className="mb-4 lg:mb-6">
+          <Col xs={8} sm={8} md={8}>
+            <Card className="text-center shadow-sm border-0 hover:shadow-md transition-shadow h-full">
               <Statistic
-                title="মোট পণ্য"
+                title={<span className="text-xs lg:text-sm">মোট পণ্য</span>}
                 value={stats.totalProducts}
-                prefix={<ShoppingOutlined className="text-blue-500" />}
-                valueStyle={{ color: "#1890ff" }}
+                prefix={
+                  <ShoppingOutlined className="text-blue-500 text-sm lg:text-base" />
+                }
+                valueStyle={{
+                  color: "#1890ff",
+                  fontSize: screens.xs ? "16px" : "20px",
+                }}
               />
             </Card>
           </Col>
-          <Col xs={24} sm={8}>
-            <Card className="text-center shadow-md border-0 hover:shadow-lg transition-shadow">
+          <Col xs={8} sm={8} md={8}>
+            <Card className="text-center shadow-sm border-0 hover:shadow-md transition-shadow h-full">
               <Statistic
-                title="কম স্টক"
+                title={<span className="text-xs lg:text-sm">কম স্টক</span>}
                 value={stats.lowStock}
                 prefix={
-                  <ExclamationCircleOutlined className="text-orange-500" />
+                  <ExclamationCircleOutlined className="text-orange-500 text-sm lg:text-base" />
                 }
-                valueStyle={{ color: "#fa8c16" }}
+                valueStyle={{
+                  color: "#fa8c16",
+                  fontSize: screens.xs ? "16px" : "20px",
+                }}
               />
             </Card>
           </Col>
-          <Col xs={24} sm={8}>
-            <Card className="text-center shadow-md border-0 hover:shadow-lg transition-shadow">
+          <Col xs={8} sm={8} md={8}>
+            <Card className="text-center shadow-sm border-0 hover:shadow-md transition-shadow h-full">
               <Statistic
-                title="স্টক নেই"
+                title={<span className="text-xs lg:text-sm">স্টক নেই</span>}
                 value={stats.outOfStock}
-                prefix={<InboxOutlined className="text-red-500" />}
-                valueStyle={{ color: "#f5222d" }}
+                prefix={
+                  <InboxOutlined className="text-red-500 text-sm lg:text-base" />
+                }
+                valueStyle={{
+                  color: "#f5222d",
+                  fontSize: screens.xs ? "16px" : "20px",
+                }}
               />
             </Card>
           </Col>
         </Row>
       </div>
 
-      {/* Search and Filter Section */}
-      <Card className="shadow-md border-0 mb-6">
-        <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-          <Input.Search
-            placeholder="পণ্যের নাম বা ক্যাটাগরি দিয়ে খুঁজুন..."
-            value={searchText}
-            onChange={(e) => handleSearch(e.target.value)}
-            className="w-full lg:w-96"
-            size="large"
-            allowClear
-            enterButton={
-              <Button
-                type="primary"
-                className="bg-blue-500 border-blue-500"
-                icon={<SearchOutlined />}
-              >
-                খুঁজুন
-              </Button>
-            }
-          />
-
-          <Select
-            placeholder="ক্যাটাগরি দিয়ে ফিল্টার করুন"
-            className="w-full lg:w-64"
-            size="large"
-            allowClear
-            onChange={(value) => {
-              if (!value) {
-                setFilteredInventory(inventoryItems);
-              } else {
-                const filtered = inventoryItems.filter(
-                  (item) => item.category === value
-                );
-                setFilteredInventory(filtered);
+      {/* Search and Filter Section - Desktop */}
+      {!isMobile && (
+        <Card className="shadow-md border-0 mb-4 lg:mb-6">
+          <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center justify-between">
+            <Input.Search
+              placeholder="পণ্যের নাম বা ক্যাটাগরি দিয়ে খুঁজুন..."
+              value={searchText}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="w-full lg:w-80"
+              size="large"
+              allowClear
+              enterButton={
+                <Button
+                  type="primary"
+                  className="bg-blue-500 border-blue-500"
+                  icon={<SearchOutlined />}
+                >
+                  খুঁজুন
+                </Button>
               }
-              setPagination({ ...pagination, current: 1 });
-            }}
-          >
-            {categories.map((category) => (
-              <Option key={category.categoryCode} value={category.categoryCode}>
-                {category.categoryName}
-              </Option>
-            ))}
-          </Select>
+            />
 
-          <Select
-            placeholder="স্টক স্ট্যাটাস"
-            className="w-full lg:w-48"
-            size="large"
-            allowClear
-            onChange={(value) => {
-              if (!value) {
-                setFilteredInventory(inventoryItems);
-              } else {
-                let filtered = [];
-                if (value === "out-of-stock") {
-                  filtered = inventoryItems.filter((item) => item.qty === 0);
-                } else if (value === "low-stock") {
-                  filtered = inventoryItems.filter(
-                    (item) => item.qty > 0 && item.qty < 5
+            <Select
+              placeholder="ক্যাটাগরি দিয়ে ফিল্টার করুন"
+              className="w-full lg:w-56"
+              size="large"
+              allowClear
+              onChange={(value) => {
+                if (!value) {
+                  setFilteredInventory(inventoryItems);
+                } else {
+                  const filtered = inventoryItems.filter(
+                    (item) => item.category === value
                   );
-                } else if (value === "in-stock") {
-                  filtered = inventoryItems.filter((item) => item.qty >= 5);
+                  setFilteredInventory(filtered);
                 }
-                setFilteredInventory(filtered);
+                setPagination({ ...pagination, current: 1 });
+              }}
+            >
+              {categories.map((category) => (
+                <Option
+                  key={category.categoryCode}
+                  value={category.categoryCode}
+                >
+                  {category.categoryName}
+                </Option>
+              ))}
+            </Select>
+
+            <Select
+              placeholder="স্টক স্ট্যাটাস"
+              className="w-full lg:w-40"
+              size="large"
+              allowClear
+              onChange={(value) => {
+                if (!value) {
+                  setFilteredInventory(inventoryItems);
+                } else {
+                  let filtered = [];
+                  if (value === "out-of-stock") {
+                    filtered = inventoryItems.filter((item) => item.qty === 0);
+                  } else if (value === "low-stock") {
+                    filtered = inventoryItems.filter(
+                      (item) => item.qty > 0 && item.qty < 5
+                    );
+                  } else if (value === "in-stock") {
+                    filtered = inventoryItems.filter((item) => item.qty >= 5);
+                  }
+                  setFilteredInventory(filtered);
+                }
+                setPagination({ ...pagination, current: 1 });
+              }}
+            >
+              <Option value="in-stock">স্টক আছে</Option>
+              <Option value="low-stock">স্টক কম</Option>
+              <Option value="out-of-stock">স্টক নেই</Option>
+            </Select>
+          </div>
+        </Card>
+      )}
+
+      {/* Mobile Search Bar */}
+      {isMobile && (
+        <Card className="shadow-sm border-0 mb-4">
+          <div className="space-y-3">
+            <Input.Search
+              placeholder="পণ্য খুঁজুন..."
+              value={searchText}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="w-full"
+              size="large"
+              allowClear
+              enterButton={
+                <Button
+                  type="primary"
+                  className="bg-blue-500 border-blue-500"
+                  icon={<SearchOutlined />}
+                />
               }
-              setPagination({ ...pagination, current: 1 });
-            }}
-          >
-            <Option value="in-stock">স্টক আছে</Option>
-            <Option value="low-stock">স্টক কম</Option>
-            <Option value="out-of-stock">স্টক নেই</Option>
-          </Select>
-        </div>
-      </Card>
+            />
+          </div>
+        </Card>
+      )}
 
       {/* Main Content */}
-      <Card className="shadow-lg border-0" bodyStyle={{ padding: 0 }}>
+      <Card
+        className="shadow-lg border-0"
+        bodyStyle={{ padding: isMobile ? "12px" : "16px" }}
+      >
         <Spin spinning={loading} size="large">
-          <Table
-            columns={columns}
-            dataSource={filteredInventory.slice(
-              (pagination.current - 1) * pagination.pageSize,
-              pagination.current * pagination.pageSize
-            )}
-            rowKey="productId"
-            pagination={{
-              ...pagination,
-              total: filteredInventory.length,
-              showSizeChanger: true,
-              showQuickJumper: true,
-              pageSizeOptions: ["10", "20", "50", "100"],
-              showTotal: (total, range) =>
-                `মোট ${total}টি পণ্যের মধ্যে ${range[0]}-${range[1]}টি দেখানো হচ্ছে`,
-              onChange: handleTableChange,
-            }}
-            scroll={{ x: 800 }}
-            className="custom-table"
-          />
+          {isMobile ? (
+            <div className="space-y-3">
+              {filteredInventory
+                .slice(
+                  (pagination.current - 1) * pagination.pageSize,
+                  pagination.current * pagination.pageSize
+                )
+                .map(renderMobileCard)}
+
+              <div className="flex justify-center mt-4">
+                <Pagination
+                  current={pagination.current}
+                  pageSize={pagination.pageSize}
+                  total={filteredInventory.length}
+                  onChange={(page, pageSize) =>
+                    setPagination({ current: page, pageSize })
+                  }
+                  showSizeChanger={false}
+                  simple
+                  size="small"
+                />
+              </div>
+            </div>
+          ) : (
+            <Table
+              columns={columns}
+              dataSource={filteredInventory.slice(
+                (pagination.current - 1) * pagination.pageSize,
+                pagination.current * pagination.pageSize
+              )}
+              rowKey="productId"
+              pagination={{
+                ...pagination,
+                total: filteredInventory.length,
+                showSizeChanger: true,
+                showQuickJumper: true,
+                pageSizeOptions: ["10", "20", "50", "100"],
+                showTotal: (total, range) =>
+                  `মোট ${total}টি পণ্যের মধ্যে ${range[0]}-${range[1]}টি দেখানো হচ্ছে`,
+                onChange: handleTableChange,
+              }}
+              scroll={{ x: 800 }}
+              className="custom-table"
+            />
+          )}
         </Spin>
       </Card>
+
+      {/* Filter Drawer for Mobile */}
+      <Drawer
+        title={
+          <div className="flex items-center justify-between">
+            <span className="text-lg font-semibold">ফিল্টার করুন</span>
+            <Button
+              type="text"
+              icon={<CloseOutlined />}
+              onClick={() => setFilterDrawerVisible(false)}
+            />
+          </div>
+        }
+        placement="right"
+        onClose={() => setFilterDrawerVisible(false)}
+        open={filterDrawerVisible}
+        width={300}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              ক্যাটাগরি
+            </label>
+            <Select
+              placeholder="ক্যাটাগরি নির্বাচন করুন"
+              className="w-full"
+              size="large"
+              allowClear
+              onChange={(value) => {
+                if (!value) {
+                  setFilteredInventory(inventoryItems);
+                } else {
+                  const filtered = inventoryItems.filter(
+                    (item) => item.category === value
+                  );
+                  setFilteredInventory(filtered);
+                }
+                setPagination({ ...pagination, current: 1 });
+                setFilterDrawerVisible(false);
+              }}
+            >
+              {categories.map((category) => (
+                <Option
+                  key={category.categoryCode}
+                  value={category.categoryCode}
+                >
+                  {category.categoryName}
+                </Option>
+              ))}
+            </Select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              স্টক স্ট্যাটাস
+            </label>
+            <Select
+              placeholder="স্ট্যাটাস নির্বাচন করুন"
+              className="w-full"
+              size="large"
+              allowClear
+              onChange={(value) => {
+                if (!value) {
+                  setFilteredInventory(inventoryItems);
+                } else {
+                  let filtered = [];
+                  if (value === "out-of-stock") {
+                    filtered = inventoryItems.filter((item) => item.qty === 0);
+                  } else if (value === "low-stock") {
+                    filtered = inventoryItems.filter(
+                      (item) => item.qty > 0 && item.qty < 5
+                    );
+                  } else if (value === "in-stock") {
+                    filtered = inventoryItems.filter((item) => item.qty >= 5);
+                  }
+                  setFilteredInventory(filtered);
+                }
+                setPagination({ ...pagination, current: 1 });
+                setFilterDrawerVisible(false);
+              }}
+            >
+              <Option value="in-stock">স্টক আছে</Option>
+              <Option value="low-stock">স্টক কম</Option>
+              <Option value="out-of-stock">স্টক নেই</Option>
+            </Select>
+          </div>
+
+          <Button
+            type="default"
+            className="w-full mt-4"
+            onClick={() => {
+              setFilteredInventory(inventoryItems);
+              setFilterDrawerVisible(false);
+            }}
+          >
+            ফিল্টার রিসেট করুন
+          </Button>
+        </div>
+      </Drawer>
 
       {/* Add/Edit Modal */}
       <Modal
         title={
-          <div className="text-xl font-bold">
+          <div className="text-lg lg:text-xl font-bold">
             {isEditing ? "পণ্য এডিট করুন" : "নতুন পণ্য যোগ করুন"}
           </div>
         }
@@ -605,9 +965,14 @@ const InventoryPage = () => {
           setFileList([]);
         }}
         footer={null}
-        width={700}
-        centered
+        width={isMobile ? "100%" : 700}
+        style={{ maxWidth: "100vw", margin: isMobile ? 0 : "5vh auto" }}
+        centered={!isMobile}
         className="modern-modal"
+        bodyStyle={{
+          maxHeight: isMobile ? "calc(100vh - 200px)" : "none",
+          overflowY: "auto",
+        }}
       >
         <Form
           onFinish={formik.handleSubmit}
@@ -700,6 +1065,31 @@ const InventoryPage = () => {
               </Form.Item>
             </Col>
             <Col xs={24} lg={12}>
+              <Form.Item
+                label="ইউনিট মূল্য"
+                required
+                validateStatus={formik.errors.unitPrice ? "error" : ""}
+                help={formik.errors.unitPrice}
+              >
+                <InputNumber
+                  name="unitPrice"
+                  value={formik.values.unitPrice}
+                  onChange={(value) => formik.setFieldValue("unitPrice", value)}
+                  onBlur={formik.handleBlur}
+                  placeholder="ইউনিট মূল্য লিখুন"
+                  min={0}
+                  step={0.01}
+                  precision={2}
+                  className="w-full"
+                  size="large"
+                  addonBefore={<DollarOutlined />}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col xs={24} lg={12}>
               <Form.Item label="ক্রয় করেছেন">
                 <Select
                   name="purchaseBy"
@@ -761,7 +1151,7 @@ const InventoryPage = () => {
                   setFileList([]);
                 }}
                 size="large"
-                className="px-6"
+                className="px-4 lg:px-6"
                 disabled={loading}
               >
                 বাতিল করুন
@@ -771,7 +1161,7 @@ const InventoryPage = () => {
                 type="primary"
                 htmlType="submit"
                 size="large"
-                className="bg-green-600 hover:bg-green-700 border-green-600 px-6"
+                className="bg-green-600 hover:bg-green-700 border-green-600 px-4 lg:px-6"
               >
                 {isEditing ? "আপডেট করুন" : "যোগ করুন"}
               </Button>
@@ -792,7 +1182,21 @@ const InventoryPage = () => {
         }
 
         .upload-dragger :global(.ant-upload) {
-          padding: 20px;
+          padding: 16px;
+        }
+
+        @media (max-width: 768px) {
+          .modern-modal :global(.ant-modal) {
+            margin: 0;
+            max-width: 100vw;
+            top: 0;
+            padding-bottom: 0;
+          }
+
+          .modern-modal :global(.ant-modal-content) {
+            height: 100vh;
+            border-radius: 0;
+          }
         }
       `}</style>
     </div>

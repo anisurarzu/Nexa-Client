@@ -507,7 +507,7 @@ const UserManagement = () => {
       width: 150,
       render: (_, record) => (
         <Space size="small">
-          {userInfo?.pagePermissions?.[3]?.editAccess && (
+          {userInfo?.pagePermissions?.[2]?.editAccess && (
             <Tooltip title="এডিট করুন">
               <Button
                 type="primary"
@@ -518,7 +518,7 @@ const UserManagement = () => {
               />
             </Tooltip>
           )}
-          {userInfo?.pagePermissions?.[3]?.editAccess && (
+          {userInfo?.pagePermissions?.[2]?.editAccess && (
             <Tooltip title="অনুমতি ব্যবস্থাপনা">
               <Button
                 type="default"
@@ -529,7 +529,7 @@ const UserManagement = () => {
               />
             </Tooltip>
           )}
-          {userInfo?.pagePermissions?.[3]?.editAccess && (
+          {userInfo?.pagePermissions?.[2]?.editAccess && (
             <Tooltip title="ডিলিট করুন">
               <Button
                 type="primary"
@@ -587,7 +587,7 @@ const UserManagement = () => {
             </p>
           </div>
 
-          {userInfo?.pagePermissions?.[3]?.insertAccess && (
+          {userInfo?.pagePermissions?.[2]?.insertAccess && (
             <Button
               type="primary"
               icon={<PlusOutlined />}
