@@ -39,7 +39,7 @@ export default function LoginPage() {
       userID: "User ID",
       password: "Password",
       login: "Sign In",
-      loginIDPlaceholder: "FTB-1234",
+      loginIDPlaceholder: "Enter your user ID",
       passwordPlaceholder: "Enter your password",
       helpText: "Use your user ID and password to login",
       required: "This field is required",
