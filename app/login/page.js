@@ -31,7 +31,7 @@ export default function LoginPage() {
       helpText: "আপনার ইউজার আইডি এবং পাসওয়ার্ড ব্যবহার করুন",
       required: "এই ফিল্ডটি প্রয়োজনীয়",
       loggingIn: "লগইন হচ্ছে...",
-      signingIn: "Signing in...",
+      signingIn: "Signing in..",
     },
     en: {
       title: "Welcome to Nexa Inventory",
