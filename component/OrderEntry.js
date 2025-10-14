@@ -672,13 +672,13 @@ const OrderEntry = () => {
         />
       ),
     },
-    // {
-    //   title: "Grand Total",
-    //   dataIndex: "grandTotal",
-    //   key: "grandTotal",
-    //   width: 120,
-    //   render: (text) => <span style={{ fontWeight: 500 }}>৳{text}</span>,
-    // },
+    {
+      title: "Grand Total",
+      dataIndex: "grandTotal",
+      key: "grandTotal",
+      width: 120,
+      render: (text) => <span style={{ fontWeight: 500 }}>৳{text}</span>,
+    },
     {
       title: "Total Due",
       dataIndex: "totalDue",

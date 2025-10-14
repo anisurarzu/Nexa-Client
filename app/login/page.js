@@ -375,7 +375,7 @@ export default function LoginPage() {
             {/* Footer */}
             <div className="mt-8 pt-6 border-t border-gray-200 text-center">
               <p className="text-gray-500 text-sm">
-                Use your FTB-XXXX ID and password to login
+                Use your userID and password to login
               </p>
               <p className="text-gray-400 text-xs mt-2">
                 © 2025 DMF Soft. All rights reserved.
