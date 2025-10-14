@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 255, 255, 255; /* Changed to white for better contrast */
+  --background-start-rgb: 0, 0, 0; /* Changed to black */
+  --background-end-rgb: 0, 0, 0; /* Changed to black */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: rgb(var(--background-start-rgb)); /* Set to black */
+}
+
+/* Smooth scrolling for the entire document */
+html {
+  scroll-behavior: smooth;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Hide the default carousel dots */
+.ant-carousel .slick-dots {
+  display: none !important;
+}
+
+/* Custom swiper pagination bullets */
+.swiper-pagination-bullet {
+  background-color: #fff; /* Changed to white for visibility */
+  opacity: 1;
+}
+
+.swiper-pagination-bullet-active {
+  background-color: #8abf55;
+}
+
+/* Custom drop shadow */
+.custom-drop-shadow {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 1),
+    0 10px 10px -5px rgba(0, 0, 0, 1);
+}
+
+/* Custom light shadow */
+.custom-light-shadow {
+  box-shadow: 0px 10px 20px rgba(255, 255, 255, 0.1),
+    0px 6px 6px rgba(255, 255, 255, 0.05);
+}
+
+.ant-layout-sider-children {
+  background: white !important; /* Changed sidebar background to black */
+}
+.ant-layout-sider-trigger {
+  background-color: #f7c83c !important;
+}
+
+.poppins-font {
+  font-family: "Poppins", sans-serif;
+}
+/* Custom CSS for rounded images and dropdown items */
+.ant-select-item-option-content {
+  display: flex;
+  align-items: center;
+}
+
+.ant-select-item-option-content img {
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+/* Style for the "Add New Product" fields */
+.add-product-fields {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  background-color: #fafafa;
+}
