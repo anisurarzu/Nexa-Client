@@ -36,6 +36,12 @@ import {
   BarChartOutlined,
   ReloadOutlined,
   PlusOutlined,
+  ArrowUpOutlined,
+  ArrowDownOutlined,
+  EyeOutlined,
+  StarOutlined,
+  TrophyOutlined,
+  RocketOutlined,
 } from "@ant-design/icons";
 import { BoxPlotOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
@@ -164,6 +170,20 @@ const rolePermissions = {
       icon: <UsergroupAddOutlined />,
     },
   ],
+};
+
+// Color schemes for different cards
+const cardGradients = {
+  primary: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+  success: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
+  warning: "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",
+  info: "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)",
+  purple: "linear-gradient(135deg, #a78bfa 0%, #7dd3fc 100%)",
+  orange: "linear-gradient(135deg, #fdba74 0%, #fb923c 100%)",
+  teal: "linear-gradient(135deg, #2dd4bf 0%, #14b8a6 100%)",
+  rose: "linear-gradient(135deg, #fb7185 0%, #f472b6 100%)",
+  green: "linear-gradient(135deg, #48bb78 0%, #38a169 100%)",
+  blue: "linear-gradient(135deg, #4299e1 0%, #3182ce 100%)",
 };
 
 // Simple Dashboard Content Component with Real Data
@@ -306,121 +326,280 @@ const DashboardContent = ({ userInfo }) => {
       {/* Header with Refresh Button */}
       <div className="flex justify-between items-center">
         <div>
-          {/* <Title level={2} className="text-gray-800 mb-2">
-            ড্যাশবোর্ড ওভারভিউ
-          </Title> */}
-          <Text className="text-gray-600">
+          <Text className="text-gray-600 text-lg">
             সিস্টেমের সামগ্রিক পরিসংখ্যান এবং কার্যক্রম
           </Text>
         </div>
         <Button
           icon={<ReloadOutlined />}
           onClick={refreshData}
-          className="flex items-center"
+          className="flex items-center bg-gradient-to-r from-green-500 to-blue-500 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 h-10 px-6"
         >
-          রিফ্রেশ
+          রিফ্রেশ ডেটা
         </Button>
       </div>
 
       {/* Main Metrics */}
-      <Row gutter={[16, 16]}>
-        <Col xs={24} sm={12} md={6}>
-          <Card className="shadow-md hover:shadow-lg transition-all duration-300 border-0">
-            <Statistic
-              title="মোট পণ্য"
-              value={dashboardData.totalProducts}
-              prefix={<BoxPlotOutlined className="text-green-600" />}
-              valueStyle={{ color: "#1B5E20" }}
-            />
+      <Row gutter={[20, 20]}>
+        <Col xs={24} sm={12} lg={6}>
+          <Card
+            className="border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:-translate-y-1"
+            bodyStyle={{
+              background: cardGradients.green,
+              borderRadius: "12px",
+              padding: "24px",
+              color: "white",
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-white text-opacity-80 text-sm font-medium mb-2">
+                  মোট পণ্য
+                </div>
+                <div className="text-3xl font-bold text-white mb-1">
+                  {dashboardData.totalProducts}
+                </div>
+                <div className="text-white text-opacity-90 text-xs">
+                  সকল পণ্য
+                </div>
+              </div>
+              <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                <BoxPlotOutlined className="text-2xl text-white" />
+              </div>
+            </div>
+            <div className="flex items-center mt-3">
+              <ArrowUpOutlined className="text-green-300 mr-1" />
+              <span className="text-green-300 text-sm font-medium">
+                +15% এই মাসে
+              </span>
+            </div>
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card className="shadow-md hover:shadow-lg transition-all duration-300 border-0">
-            <Statistic
-              title="কম স্টক"
-              value={dashboardData.lowStock}
-              prefix={<WarningOutlined className="text-orange-500" />}
-              valueStyle={{ color: "#F57C00" }}
-            />
+
+        <Col xs={24} sm={12} lg={6}>
+          <Card
+            className="border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:-translate-y-1"
+            bodyStyle={{
+              background: cardGradients.orange,
+              borderRadius: "12px",
+              padding: "24px",
+              color: "white",
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-white text-opacity-80 text-sm font-medium mb-2">
+                  কম স্টক
+                </div>
+                <div className="text-3xl font-bold text-white mb-1">
+                  {dashboardData.lowStock}
+                </div>
+                <div className="text-white text-opacity-90 text-xs">
+                  মনিটরিং প্রয়োজন
+                </div>
+              </div>
+              <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                <WarningOutlined className="text-2xl text-white" />
+              </div>
+            </div>
+            <div className="flex items-center mt-3">
+              <ArrowUpOutlined className="text-orange-300 mr-1" />
+              <span className="text-orange-300 text-sm font-medium">
+                নজর রাখুন
+              </span>
+            </div>
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card className="shadow-md hover:shadow-lg transition-all duration-300 border-0">
-            <Statistic
-              title="মাসিক বিক্রয়"
-              value={dashboardData.monthlySales}
-              prefix={<DollarCircleOutlined className="text-blue-600" />}
-              valueStyle={{ color: "#388E3C" }}
-              suffix="৳"
-            />
+
+        <Col xs={24} sm={12} lg={6}>
+          <Card
+            className="border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:-translate-y-1"
+            bodyStyle={{
+              background: cardGradients.blue,
+              borderRadius: "12px",
+              padding: "24px",
+              color: "white",
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-white text-opacity-80 text-sm font-medium mb-2">
+                  মাসিক বিক্রয়
+                </div>
+                <div className="text-2xl font-bold text-white mb-1">
+                  {(dashboardData.monthlySales / 100000).toFixed(1)}L
+                </div>
+                <div className="text-white text-opacity-90 text-xs">
+                  মাসিক রাজস্ব
+                </div>
+              </div>
+              <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                <DollarCircleOutlined className="text-2xl text-white" />
+              </div>
+            </div>
+            <div className="flex items-center mt-3">
+              <ArrowUpOutlined className="text-green-300 mr-1" />
+              <span className="text-green-300 text-sm font-medium">
+                +18% গত মাস থেকে
+              </span>
+            </div>
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card className="shadow-md hover:shadow-lg transition-all duration-300 border-0">
-            <Statistic
-              title="মুলতুবি অর্ডার"
-              value={dashboardData.pendingOrders}
-              prefix={<ShoppingCartOutlined className="text-blue-500" />}
-              valueStyle={{ color: "#0288D1" }}
-            />
+
+        <Col xs={24} sm={12} lg={6}>
+          <Card
+            className="border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:-translate-y-1"
+            bodyStyle={{
+              background: cardGradients.purple,
+              borderRadius: "12px",
+              padding: "24px",
+              color: "white",
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-white text-opacity-80 text-sm font-medium mb-2">
+                  মুলতুবি অর্ডার
+                </div>
+                <div className="text-3xl font-bold text-white mb-1">
+                  {dashboardData.pendingOrders}
+                </div>
+                <div className="text-white text-opacity-90 text-xs">
+                  প্রক্রিয়াধীন
+                </div>
+              </div>
+              <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                <ShoppingCartOutlined className="text-2xl text-white" />
+              </div>
+            </div>
+            <div className="flex items-center mt-3">
+              <Progress
+                percent={
+                  Math.round(
+                    (dashboardData.pendingOrders / dashboardData.totalOrders) *
+                      100
+                  ) || 0
+                }
+                size="small"
+                strokeColor="#ffffff"
+                trailColor="rgba(255,255,255,0.3)"
+                showInfo={false}
+              />
+            </div>
           </Card>
         </Col>
       </Row>
 
       {/* Additional Metrics */}
-      <Row gutter={[16, 16]}>
+      <Row gutter={[20, 20]}>
         <Col xs={24} sm={12} md={6}>
-          <Card className="shadow-md hover:shadow-lg transition-all duration-300 border-0">
-            <Statistic
-              title="দৈনিক বিক্রয়"
-              value={dashboardData.dailySales}
-              prefix={<DollarCircleOutlined className="text-green-500" />}
-              valueStyle={{ color: "#2E7D32" }}
-              suffix="৳"
-            />
+          <Card
+            className="border-0 shadow-xl hover:shadow-2xl transition-all duration-500 bg-white"
+            bodyStyle={{ padding: "20px" }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-gray-600 text-sm font-medium mb-1">
+                  দৈনিক বিক্রয়
+                </div>
+                <div className="text-2xl font-bold text-green-600">
+                  {dashboardData.dailySales}
+                </div>
+                <div className="text-gray-500 text-xs">আজকের বিক্রয়</div>
+              </div>
+              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                <DollarCircleOutlined className="text-lg text-green-600" />
+              </div>
+            </div>
           </Card>
         </Col>
+
         <Col xs={24} sm={12} md={6}>
-          <Card className="shadow-md hover:shadow-lg transition-all duration-300 border-0">
-            <Statistic
-              title="স্টক নেই"
-              value={dashboardData.outOfStock}
-              prefix={<InboxOutlined className="text-red-500" />}
-              valueStyle={{ color: "#D32F2F" }}
-            />
+          <Card
+            className="border-0 shadow-xl hover:shadow-2xl transition-all duration-500 bg-white"
+            bodyStyle={{ padding: "20px" }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-gray-600 text-sm font-medium mb-1">
+                  স্টক নেই
+                </div>
+                <div className="text-2xl font-bold text-red-600">
+                  {dashboardData.outOfStock}
+                </div>
+                <div className="text-gray-500 text-xs">পুনঃস্থাপন প্রয়োজন</div>
+              </div>
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                <InboxOutlined className="text-lg text-red-600" />
+              </div>
+            </div>
           </Card>
         </Col>
+
         <Col xs={24} sm={12} md={6}>
-          <Card className="shadow-md hover:shadow-lg transition-all duration-300 border-0">
-            <Statistic
-              title="মোট অর্ডার"
-              value={dashboardData.totalOrders}
-              prefix={<ShoppingOutlined className="text-purple-500" />}
-              valueStyle={{ color: "#7B1FA2" }}
-            />
+          <Card
+            className="border-0 shadow-xl hover:shadow-2xl transition-all duration-500 bg-white"
+            bodyStyle={{ padding: "20px" }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-gray-600 text-sm font-medium mb-1">
+                  মোট অর্ডার
+                </div>
+                <div className="text-2xl font-bold text-purple-600">
+                  {dashboardData.totalOrders}
+                </div>
+                <div className="text-gray-500 text-xs">সকল অর্ডার</div>
+              </div>
+              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                <ShoppingOutlined className="text-lg text-purple-600" />
+              </div>
+            </div>
           </Card>
         </Col>
+
         <Col xs={24} sm={12} md={6}>
-          <Card className="shadow-md hover:shadow-lg transition-all duration-300 border-0">
-            <Statistic
-              title="ব্যবহারকারী"
-              value={dashboardData.totalUsers}
-              prefix={<UserOutlined className="text-cyan-500" />}
-              valueStyle={{ color: "#0097A7" }}
-            />
+          <Card
+            className="border-0 shadow-xl hover:shadow-2xl transition-all duration-500 bg-white"
+            bodyStyle={{ padding: "20px" }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-gray-600 text-sm font-medium mb-1">
+                  ব্যবহারকারী
+                </div>
+                <div className="text-2xl font-bold text-cyan-600">
+                  {dashboardData.totalUsers}
+                </div>
+                <div className="text-gray-500 text-xs">সক্রিয় ব্যবহারকারী</div>
+              </div>
+              <div className="w-10 h-10 bg-cyan-100 rounded-full flex items-center justify-center">
+                <UserOutlined className="text-lg text-cyan-600" />
+              </div>
+            </div>
           </Card>
         </Col>
       </Row>
 
       {/* Additional Sections */}
-      <Row gutter={[16, 16]}>
+      <Row gutter={[20, 20]}>
         <Col xs={24} lg={12}>
           <Card
-            title="কম স্টক সতর্কতা"
-            className="shadow-md border-0"
-            headStyle={{ borderBottom: "1px solid #f0f0f0", color: "#F57C00" }}
+            title={
+              <div className="flex items-center">
+                <WarningOutlined className="text-orange-600 mr-2" />
+                <span className="text-lg font-bold text-gray-800">
+                  কম স্টক সতর্কতা
+                </span>
+              </div>
+            }
+            className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300"
+            headStyle={{
+              borderBottom: "1px solid #f0f0f0",
+              padding: "16px 20px",
+            }}
             extra={
-              <Tag color="orange">
+              <Tag color="orange" className="border-0">
                 {dashboardData.lowStockItems.length} আইটেম
               </Tag>
             }
@@ -428,10 +607,12 @@ const DashboardContent = ({ userInfo }) => {
             <List
               dataSource={dashboardData.lowStockItems}
               renderItem={(item, index) => (
-                <List.Item>
+                <List.Item className="border-0 !px-0 !py-3">
                   <div className="flex justify-between items-center w-full">
                     <div>
-                      <Text strong>{item.name}</Text>
+                      <Text strong className="text-gray-800">
+                        {item.name}
+                      </Text>
                       <br />
                       <Text type="warning" className="text-xs">
                         {item.stock} অবশিষ্ট (সীমা: {item.threshold})
@@ -440,7 +621,7 @@ const DashboardContent = ({ userInfo }) => {
                     <Progress
                       percent={Math.round((item.stock / item.threshold) * 100)}
                       size="small"
-                      strokeColor="#F57C00"
+                      strokeColor="#F59E0B"
                       className="w-24"
                     />
                   </div>
@@ -453,11 +634,21 @@ const DashboardContent = ({ userInfo }) => {
 
         <Col xs={24} lg={12}>
           <Card
-            title="সাম্প্রতিক অর্ডার"
-            className="shadow-md border-0"
-            headStyle={{ borderBottom: "1px solid #f0f0f0", color: "#388E3C" }}
+            title={
+              <div className="flex items-center">
+                <ShoppingCartOutlined className="text-green-600 mr-2" />
+                <span className="text-lg font-bold text-gray-800">
+                  সাম্প্রতিক অর্ডার
+                </span>
+              </div>
+            }
+            className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300"
+            headStyle={{
+              borderBottom: "1px solid #f0f0f0",
+              padding: "16px 20px",
+            }}
             extra={
-              <Tag color="green">
+              <Tag color="green" className="border-0">
                 {dashboardData.recentOrders.length} অর্ডার
               </Tag>
             }
@@ -465,13 +656,15 @@ const DashboardContent = ({ userInfo }) => {
             <List
               dataSource={dashboardData.recentOrders}
               renderItem={(item, index) => (
-                <List.Item>
+                <List.Item className="border-0 !px-0 !py-3">
                   <List.Item.Meta
-                    avatar={<ShoppingCartOutlined className="text-green-600" />}
-                    title={`${item.item}`}
+                    avatar={
+                      <ShoppingCartOutlined className="text-green-600 text-lg" />
+                    }
+                    title={<span className="text-gray-800">{item.item}</span>}
                     description={
                       <div>
-                        <div>তারিখ: {item.date}</div>
+                        <div className="text-gray-600">তারিখ: {item.date}</div>
                         <div>
                           <Tag
                             color={
@@ -481,7 +674,7 @@ const DashboardContent = ({ userInfo }) => {
                                 ? "orange"
                                 : "blue"
                             }
-                            size="small"
+                            className="border-0 text-white"
                           >
                             {item.status}
                           </Tag>
@@ -497,27 +690,39 @@ const DashboardContent = ({ userInfo }) => {
         </Col>
       </Row>
 
-      <Row gutter={[16, 16]}>
+      <Row gutter={[20, 20]}>
         <Col xs={24} lg={12}>
           <Card
-            title="পণ্য ক্যাটাগরি"
-            className="shadow-md border-0"
-            headStyle={{ borderBottom: "1px solid #f0f0f0", color: "#1B5E20" }}
+            title={
+              <div className="flex items-center">
+                <BarChartOutlined className="text-blue-600 mr-2" />
+                <span className="text-lg font-bold text-gray-800">
+                  পণ্য ক্যাটাগরি
+                </span>
+              </div>
+            }
+            className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300"
+            headStyle={{
+              borderBottom: "1px solid #f0f0f0",
+              padding: "16px 20px",
+            }}
             extra={
-              <Tag color="green">
+              <Tag color="blue" className="border-0">
                 {dashboardData.inventoryStats.length} ক্যাটাগরি
               </Tag>
             }
           >
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-3">
               {dashboardData.inventoryStats.map((category, index) => (
-                <Tag
+                <div
                   key={index}
-                  color="green"
-                  className="text-white border-none px-3 py-1"
+                  className="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-2 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105"
                 >
-                  {category.name} ({category.count})
-                </Tag>
+                  <div className="font-semibold">{category.name}</div>
+                  <div className="text-sm opacity-90">
+                    {category.count} পণ্য
+                  </div>
+                </div>
               ))}
             </div>
             {dashboardData.inventoryStats.length === 0 && (
@@ -530,29 +735,39 @@ const DashboardContent = ({ userInfo }) => {
 
         <Col xs={24} lg={12}>
           <Card
-            title="দ্রুত কর্ম"
-            className="shadow-md border-0"
-            headStyle={{ borderBottom: "1px solid #f0f0f0", color: "#0288D1" }}
+            title={
+              <div className="flex items-center">
+                <RocketOutlined className="text-purple-600 mr-2" />
+                <span className="text-lg font-bold text-gray-800">
+                  দ্রুত কর্ম
+                </span>
+              </div>
+            }
+            className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300"
+            headStyle={{
+              borderBottom: "1px solid #f0f0f0",
+              padding: "16px 20px",
+            }}
           >
-            <div className="space-y-3">
+            <div className="space-y-4">
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
-                className="w-full bg-green-600 border-green-600"
+                className="w-full h-12 text-lg bg-gradient-to-r from-green-500 to-blue-500 border-0 shadow-md hover:shadow-lg transition-all duration-300"
                 onClick={() => (window.location.href = "#/inventory")}
               >
                 নতুন পণ্য যোগ করুন
               </Button>
               <Button
                 icon={<ShoppingCartOutlined />}
-                className="w-full border-blue-500 text-blue-500"
+                className="w-full h-12 text-lg border-blue-500 text-blue-500 hover:bg-blue-50 transition-all duration-300"
                 onClick={() => (window.location.href = "#/orders")}
               >
                 অর্ডার দেখুন
               </Button>
               <Button
                 icon={<UserOutlined />}
-                className="w-full border-purple-500 text-purple-500"
+                className="w-full h-12 text-lg border-purple-500 text-purple-500 hover:bg-purple-50 transition-all duration-300"
                 onClick={() => (window.location.href = "#/users")}
               >
                 ব্যবহারকারী ব্যবস্থাপনা
@@ -567,30 +782,58 @@ const DashboardContent = ({ userInfo }) => {
 
 // Simple placeholder components for other menu items
 const OrderDashboard = () => (
-  <Card className="border-0 shadow-lg">
-    <Title level={3}>অর্ডার ড্যাশবোর্ড</Title>
-    <Text>অর্ডার ব্যবস্থাপনা বিষয়বস্তু এখানে থাকবে</Text>
+  <Card className="border-0 shadow-2xl rounded-2xl">
+    <div className="text-center py-8">
+      <ShoppingCartOutlined className="text-6xl text-blue-500 mb-4" />
+      <Title level={3} className="text-gray-800">
+        অর্ডার ড্যাশবোর্ড
+      </Title>
+      <Text className="text-gray-600 text-lg">
+        অর্ডার ব্যবস্থাপনা বিষয়বস্তু এখানে থাকবে
+      </Text>
+    </div>
   </Card>
 );
 
 const InventoryManagement = () => (
-  <Card className="border-0 shadow-lg">
-    <Title level={3}>ইনভেন্টরি ব্যবস্থাপনা</Title>
-    <Text>ইনভেন্টরি ব্যবস্থাপনা বিষয়বস্তু এখানে থাকবে</Text>
+  <Card className="border-0 shadow-2xl rounded-2xl">
+    <div className="text-center py-8">
+      <InboxOutlined className="text-6xl text-green-500 mb-4" />
+      <Title level={3} className="text-gray-800">
+        ইনভেন্টরি ব্যবস্থাপনা
+      </Title>
+      <Text className="text-gray-600 text-lg">
+        ইনভেন্টরি ব্যবস্থাপনা বিষয়বস্তু এখানে থাকবে
+      </Text>
+    </div>
   </Card>
 );
 
 const ExpenseManagement = () => (
-  <Card className="border-0 shadow-lg">
-    <Title level={3}>খরচ ব্যবস্থাপনা</Title>
-    <Text>খরচ ট্র্যাকিং বিষয়বস্তু এখানে থাকবে</Text>
+  <Card className="border-0 shadow-2xl rounded-2xl">
+    <div className="text-center py-8">
+      <MoneyCollectOutlined className="text-6xl text-orange-500 mb-4" />
+      <Title level={3} className="text-gray-800">
+        খরচ ব্যবস্থাপনা
+      </Title>
+      <Text className="text-gray-600 text-lg">
+        খরচ ট্র্যাকিং বিষয়বস্তু এখানে থাকবে
+      </Text>
+    </div>
   </Card>
 );
 
 const UserManagement = () => (
-  <Card className="border-0 shadow-lg">
-    <Title level={3}>ব্যবহারকারী ব্যবস্থাপনা</Title>
-    <Text>ব্যবহারকারী ব্যবস্থাপনা বিষয়বস্তু এখানে থাকবে</Text>
+  <Card className="border-0 shadow-2xl rounded-2xl">
+    <div className="text-center py-8">
+      <UserOutlined className="text-6xl text-purple-500 mb-4" />
+      <Title level={3} className="text-gray-800">
+        ব্যবহারকারী ব্যবস্থাপনা
+      </Title>
+      <Text className="text-gray-600 text-lg">
+        ব্যবহারকারী ব্যবস্থাপনা বিষয়বস্তু এখানে থাকবে
+      </Text>
+    </div>
   </Card>
 );
 
