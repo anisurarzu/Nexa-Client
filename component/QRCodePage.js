@@ -180,16 +180,16 @@ const QRCodePage = () => {
     return category ? category.categoryName : categoryValue;
   };
 
+  // Fixed QR Data Generation - Simple and compatible format
   const generateQRData = (product) => {
-    return JSON.stringify({
+    const qrData = {
       productId: product.productId,
       productName: product.productName,
       category: product.category,
-      categoryName: getCategoryLabel(product.category),
       price: product.unitPrice,
       quantity: product.qty,
-      lastUpdated: product.createdDate,
-    });
+    };
+    return JSON.stringify(qrData);
   };
 
   const handleBulkPrint = () => {
@@ -226,7 +226,8 @@ const QRCodePage = () => {
         ctx.drawImage(img, 0, 0, width, height);
         resolve(canvas.toDataURL("image/png"));
       };
-      img.src = "data:image/svg+xml;base64," + btoa(svg);
+      img.src =
+        "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
     });
   };
 
