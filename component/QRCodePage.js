@@ -20,6 +20,8 @@ import {
   Dropdown,
   Menu,
   Typography,
+  Grid,
+  Drawer,
 } from "antd";
 import {
   QrcodeOutlined,
@@ -31,6 +33,8 @@ import {
   EyeOutlined,
   MoreOutlined,
   FilePdfOutlined,
+  MenuOutlined,
+  CloseOutlined,
 } from "@ant-design/icons";
 import { useReactToPrint } from "react-to-print";
 import QRCode from "react-qr-code";
@@ -41,6 +45,7 @@ import jsPDF from "jspdf";
 const { Option } = Select;
 const { RangePicker } = DatePicker;
 const { Text } = Typography;
+const { useBreakpoint } = Grid;
 
 const QRCodePage = () => {
   const [products, setProducts] = useState([]);
@@ -57,12 +62,20 @@ const QRCodePage = () => {
   });
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewProduct, setPreviewProduct] = useState(null);
+  const [filterDrawerVisible, setFilterDrawerVisible] = useState(false);
+  const [mobileView, setMobileView] = useState("list"); // 'list' or 'grid'
 
   const printRef = useRef();
+  const screens = useBreakpoint();
+
   const userInfo =
     typeof window !== "undefined"
       ? JSON.parse(localStorage.getItem("userInfo") || "{}")
       : {};
+
+  // Check if mobile device
+  const isMobile = !screens.md;
+  const isTablet = !screens.lg;
 
   // Fetch products
   const fetchProducts = async () => {
@@ -368,10 +381,137 @@ const QRCodePage = () => {
       category: "",
       dateRange: [],
     });
+    setFilterDrawerVisible(false);
     message.success("ফিল্টার রিসেট করা হয়েছে!");
   };
 
-  const columns = [
+  const applyFiltersAndClose = () => {
+    applyFilters();
+    setFilterDrawerVisible(false);
+  };
+
+  // Mobile-friendly columns
+  const mobileColumns = [
+    {
+      title: "পণ্য",
+      key: "product",
+      render: (_, record) => (
+        <div className="flex items-start gap-3">
+          <div className="flex-shrink-0">
+            <input
+              type="checkbox"
+              checked={selectedProducts.some(
+                (p) => p.productId === record.productId
+              )}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setSelectedProducts([...selectedProducts, record]);
+                } else {
+                  setSelectedProducts(
+                    selectedProducts.filter(
+                      (p) => p.productId !== record.productId
+                    )
+                  );
+                }
+              }}
+              className="mt-1"
+            />
+          </div>
+          <Image
+            src={
+              record.imageUrl
+                ? `data:image/jpeg;base64,${record.imageUrl}`
+                : "/placeholder/40/40"
+            }
+            alt="Product"
+            width={50}
+            height={50}
+            style={{ borderRadius: "6px", objectFit: "cover" }}
+            fallback="/placeholder/40/40"
+            preview={false}
+          />
+          <div className="flex-1 min-w-0">
+            <Text strong className="block text-sm truncate">
+              {record.productName}
+            </Text>
+            <Tag color="blue" className="text-xs mt-1">
+              {getCategoryLabel(record.category)}
+            </Tag>
+            <div className="flex items-center gap-2 mt-1">
+              <Tag
+                color={
+                  record.qty === 0 ? "red" : record.qty < 5 ? "orange" : "green"
+                }
+                className="text-xs"
+              >
+                {record.qty || 0} পিস
+              </Tag>
+              <Text type="secondary" className="text-xs">
+                ৳{(record.unitPrice || 0).toFixed(2)}
+              </Text>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: "QR কোড",
+      key: "qrcode",
+      width: 60,
+      render: (_, record) => (
+        <div className="text-center">
+          <QRCode
+            value={generateQRData(record)}
+            size={40}
+            style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+          />
+        </div>
+      ),
+    },
+    {
+      title: "কর্ম",
+      key: "actions",
+      width: 50,
+      render: (_, record) => (
+        <Dropdown
+          overlay={
+            <Menu
+              items={[
+                {
+                  key: "preview",
+                  icon: <EyeOutlined />,
+                  label: "প্রিভিউ দেখুন",
+                  onClick: () => {
+                    setPreviewProduct(record);
+                    setPreviewVisible(true);
+                  },
+                },
+                {
+                  key: "print",
+                  icon: <PrinterOutlined />,
+                  label: "প্রিন্ট করুন",
+                  onClick: () => handleSinglePrint(record),
+                },
+                {
+                  key: "download",
+                  icon: <DownloadOutlined />,
+                  label: "PNG ডাউনলোড",
+                  onClick: () => handleDownloadQR(record),
+                },
+              ]}
+            />
+          }
+          trigger={["click"]}
+          placement="bottomRight"
+        >
+          <Button type="text" icon={<MoreOutlined />} size="small" />
+        </Dropdown>
+      ),
+    },
+  ];
+
+  // Desktop columns
+  const desktopColumns = [
     {
       title: "ছবি",
       dataIndex: "imageUrl",
@@ -487,6 +627,125 @@ const QRCodePage = () => {
     },
   ];
 
+  // Mobile Grid View Component
+  const MobileGridView = () => (
+    <div className="grid grid-cols-1 gap-3">
+      {filteredProducts
+        .slice(
+          (pagination.current - 1) * pagination.pageSize,
+          pagination.current * pagination.pageSize
+        )
+        .map((product) => (
+          <Card
+            key={product.productId}
+            className="shadow-sm hover:shadow-md transition-shadow"
+            bodyStyle={{ padding: "12px" }}
+          >
+            <div className="flex gap-3">
+              <div className="flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={selectedProducts.some(
+                    (p) => p.productId === product.productId
+                  )}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedProducts([...selectedProducts, product]);
+                    } else {
+                      setSelectedProducts(
+                        selectedProducts.filter(
+                          (p) => p.productId !== product.productId
+                        )
+                      );
+                    }
+                  }}
+                  className="mt-1"
+                />
+              </div>
+
+              <Image
+                src={
+                  product.imageUrl
+                    ? `data:image/jpeg;base64,${product.imageUrl}`
+                    : "/placeholder/40/40"
+                }
+                alt="Product"
+                width={60}
+                height={60}
+                style={{ borderRadius: "6px", objectFit: "cover" }}
+                fallback="/placeholder/40/40"
+                preview={false}
+              />
+
+              <div className="flex-1 min-w-0">
+                <Text strong className="block text-sm mb-1">
+                  {product.productName}
+                </Text>
+                <Tag color="blue" className="text-xs mb-1">
+                  {getCategoryLabel(product.category)}
+                </Tag>
+                <div className="flex items-center gap-2 mb-2">
+                  <Tag
+                    color={
+                      product.qty === 0
+                        ? "red"
+                        : product.qty < 5
+                        ? "orange"
+                        : "green"
+                    }
+                    className="text-xs"
+                  >
+                    {product.qty || 0} পিস
+                  </Tag>
+                  <Text type="secondary" className="text-xs">
+                    ৳{(product.unitPrice || 0).toFixed(2)}
+                  </Text>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex justify-center">
+                    <QRCode
+                      value={generateQRData(product)}
+                      size={40}
+                      style={{
+                        height: "auto",
+                        maxWidth: "100%",
+                        width: "100%",
+                      }}
+                    />
+                  </div>
+
+                  <Space>
+                    <Button
+                      type="text"
+                      icon={<EyeOutlined />}
+                      size="small"
+                      onClick={() => {
+                        setPreviewProduct(product);
+                        setPreviewVisible(true);
+                      }}
+                    />
+                    <Button
+                      type="text"
+                      icon={<PrinterOutlined />}
+                      size="small"
+                      onClick={() => handleSinglePrint(product)}
+                    />
+                    <Button
+                      type="text"
+                      icon={<DownloadOutlined />}
+                      size="small"
+                      onClick={() => handleDownloadQR(product)}
+                    />
+                  </Space>
+                </div>
+              </div>
+            </div>
+          </Card>
+        ))}
+    </div>
+  );
+
   // Print component
   const PrintQRCodes = () => (
     <div ref={printRef} className="p-6 bg-white">
@@ -589,36 +848,70 @@ const QRCodePage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 lg:p-6">
+    <div className="min-h-screen bg-gray-50 p-3 lg:p-6">
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl lg:text-3xl font-bold text-gray-800 mb-2">
+      <div className="mb-4 lg:mb-6">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 lg:gap-4 mb-4 lg:mb-6">
+          <div className="flex-1">
+            <h1 className="text-xl lg:text-3xl font-bold text-gray-800 mb-1 lg:mb-2">
               QR কোড জেনারেটর
             </h1>
-            <p className="text-gray-600">
+            <p className="text-gray-600 text-sm lg:text-base">
               আপনার পণ্যগুলির QR কোড জেনারেট এবং প্রিন্ট করুন
             </p>
           </div>
 
-          <Space>
+          <div className="flex items-center gap-2">
+            {isMobile && (
+              <div className="flex-1 flex gap-1">
+                <Button
+                  type={mobileView === "list" ? "primary" : "default"}
+                  size="small"
+                  onClick={() => setMobileView("list")}
+                  className="flex-1"
+                >
+                  তালিকা
+                </Button>
+                <Button
+                  type={mobileView === "grid" ? "primary" : "default"}
+                  size="small"
+                  onClick={() => setMobileView("grid")}
+                  className="flex-1"
+                >
+                  গ্রিড
+                </Button>
+              </div>
+            )}
+
             <Button
               icon={<ReloadOutlined />}
               onClick={fetchProducts}
               className="border-blue-500 text-blue-500"
+              size={isMobile ? "small" : "middle"}
             >
-              রিফ্রেশ
+              {isMobile ? "" : "রিফ্রেশ"}
             </Button>
-            {selectedProducts.length > 0 && (
+
+            {isMobile && (
+              <Button
+                icon={<FilterOutlined />}
+                onClick={() => setFilterDrawerVisible(true)}
+                size="small"
+              >
+                ফিল্টার
+              </Button>
+            )}
+
+            {selectedProducts.length > 0 && !isMobile && (
               <>
                 <Button
                   type="primary"
                   icon={<PrinterOutlined />}
                   onClick={handleBulkPrint}
                   className="bg-green-600 hover:bg-green-700 border-green-600"
+                  size={isMobile ? "small" : "middle"}
                 >
-                  প্রিন্ট ({selectedProducts.length})
+                  {isMobile ? "" : `প্রিন্ট (${selectedProducts.length})`}
                 </Button>
                 <Button
                   type="primary"
@@ -626,243 +919,175 @@ const QRCodePage = () => {
                   onClick={handleDownloadPDF}
                   className="bg-red-600 hover:bg-red-700 border-red-600"
                   loading={loading}
+                  size={isMobile ? "small" : "middle"}
                 >
-                  PDF ({selectedProducts.length})
+                  {isMobile ? "" : `PDF (${selectedProducts.length})`}
                 </Button>
               </>
             )}
-          </Space>
+          </div>
         </div>
 
-        {/* Filters */}
-        <Card className="shadow-md border-0 mb-6">
-          <Row gutter={[16, 16]} align="middle">
-            <Col xs={24} md={6}>
-              <Input.Search
-                placeholder="পণ্যের নাম বা ID দিয়ে খুঁজুন..."
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                allowClear
-                enterButton={<SearchOutlined />}
-                size="middle"
-              />
-            </Col>
+        {/* Desktop Filters */}
+        {!isMobile && (
+          <Card className="shadow-md border-0 mb-4 lg:mb-6">
+            <Row gutter={[16, 16]} align="middle">
+              <Col xs={24} md={6}>
+                <Input.Search
+                  placeholder="পণ্যের নাম বা ID দিয়ে খুঁজুন..."
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  allowClear
+                  enterButton={<SearchOutlined />}
+                  size="middle"
+                />
+              </Col>
 
-            <Col xs={24} md={6}>
-              <Select
-                placeholder="ক্যাটাগরি নির্বাচন করুন"
-                value={filters.category}
-                onChange={(value) =>
-                  setFilters({ ...filters, category: value })
-                }
-                className="w-full"
-                allowClear
-                size="middle"
-              >
-                {categories.map((category) => (
-                  <Option
-                    key={category.categoryCode}
-                    value={category.categoryCode}
-                  >
-                    {category.categoryName}
-                  </Option>
-                ))}
-              </Select>
-            </Col>
-
-            <Col xs={24} md={8}>
-              <RangePicker
-                className="w-full"
-                placeholder={["শুরুর তারিখ", "শেষ তারিখ"]}
-                value={filters.dateRange}
-                onChange={(dates) =>
-                  setFilters({ ...filters, dateRange: dates })
-                }
-                format="DD/MM/YYYY"
-                size="middle"
-              />
-            </Col>
-
-            <Col xs={24} md={4}>
-              <Space className="w-full" direction="vertical">
-                <Button
-                  icon={<FilterOutlined />}
-                  onClick={resetFilters}
+              <Col xs={24} md={6}>
+                <Select
+                  placeholder="ক্যাটাগরি নির্বাচন করুন"
+                  value={filters.category}
+                  onChange={(value) =>
+                    setFilters({ ...filters, category: value })
+                  }
                   className="w-full"
-                  danger
+                  allowClear
                   size="middle"
                 >
-                  ফিল্টার রিসেট
-                </Button>
-              </Space>
-            </Col>
-          </Row>
-        </Card>
+                  {categories.map((category) => (
+                    <Option
+                      key={category.categoryCode}
+                      value={category.categoryCode}
+                    >
+                      {category.categoryName}
+                    </Option>
+                  ))}
+                </Select>
+              </Col>
+
+              <Col xs={24} md={8}>
+                <RangePicker
+                  className="w-full"
+                  placeholder={["শুরুর তারিখ", "শেষ তারিখ"]}
+                  value={filters.dateRange}
+                  onChange={(dates) =>
+                    setFilters({ ...filters, dateRange: dates })
+                  }
+                  format="DD/MM/YYYY"
+                  size="middle"
+                />
+              </Col>
+
+              <Col xs={24} md={4}>
+                <Space className="w-full" direction="vertical">
+                  <Button
+                    icon={<FilterOutlined />}
+                    onClick={resetFilters}
+                    className="w-full"
+                    danger
+                    size="middle"
+                  >
+                    ফিল্টার রিসেট
+                  </Button>
+                </Space>
+              </Col>
+            </Row>
+          </Card>
+        )}
+
+        {/* Mobile Search */}
+        {isMobile && (
+          <Card className="shadow-md border-0 mb-4">
+            <Input.Search
+              placeholder="পণ্যের নাম বা ID দিয়ে খুঁজুন..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              allowClear
+              enterButton={<SearchOutlined />}
+              size="large"
+            />
+          </Card>
+        )}
       </div>
 
-      {/* Products Table */}
-      <Card className="shadow-lg border-0 mb-6">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gray-50">
-                <th className="p-2 text-left">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedProducts(filteredProducts);
-                        } else {
-                          setSelectedProducts([]);
-                        }
-                      }}
-                      checked={
-                        selectedProducts.length === filteredProducts.length &&
-                        filteredProducts.length > 0
-                      }
-                    />
-                    <span>নির্বাচন</span>
-                  </div>
-                </th>
-                <th className="p-2 text-left">ছবি</th>
-                <th className="p-2 text-left">পণ্যের নাম</th>
-                <th className="p-2 text-left">ক্যাটাগরি</th>
-                <th className="p-2 text-left">পরিমাণ</th>
-                <th className="p-2 text-left">মূল্য</th>
-                <th className="p-2 text-left">QR কোড</th>
-                <th className="p-2 text-left">কর্ম</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredProducts
-                .slice(
-                  (pagination.current - 1) * pagination.pageSize,
-                  pagination.current * pagination.pageSize
-                )
-                .map((product) => (
-                  <tr
-                    key={product.productId}
-                    className="border-b hover:bg-gray-50"
+      {/* Selection Info */}
+      {selectedProducts.length > 0 && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <Text strong className="text-blue-800">
+                {selectedProducts.length}টি পণ্য নির্বাচিত
+              </Text>
+            </div>
+            <Space>
+              {isMobile && (
+                <>
+                  <Button
+                    type="primary"
+                    icon={<PrinterOutlined />}
+                    onClick={handleBulkPrint}
+                    size="small"
+                    className="bg-green-600 hover:bg-green-700"
                   >
-                    <td className="p-2">
-                      <input
-                        type="checkbox"
-                        checked={selectedProducts.some(
-                          (p) => p.productId === product.productId
-                        )}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedProducts([...selectedProducts, product]);
-                          } else {
-                            setSelectedProducts(
-                              selectedProducts.filter(
-                                (p) => p.productId !== product.productId
-                              )
-                            );
-                          }
-                        }}
-                      />
-                    </td>
-                    <td className="p-2">
-                      <Image
-                        src={
-                          product.imageUrl
-                            ? `data:image/jpeg;base64,${product.imageUrl}`
-                            : "/placeholder/40/40"
-                        }
-                        alt="Product"
-                        width={40}
-                        height={40}
-                        style={{ borderRadius: "4px", objectFit: "cover" }}
-                        fallback="/placeholder/40/40"
-                        preview={false}
-                      />
-                    </td>
-                    <td className="p-2">{product.productName}</td>
-                    <td className="p-2">
-                      <Tag color="blue">
-                        {getCategoryLabel(product.category)}
-                      </Tag>
-                    </td>
-                    <td className="p-2">
-                      <Tag
-                        color={
-                          product.qty === 0
-                            ? "red"
-                            : product.qty < 5
-                            ? "orange"
-                            : "green"
-                        }
-                      >
-                        {product.qty || 0} পিস
-                      </Tag>
-                    </td>
-                    <td className="p-2">
-                      ৳{(product.unitPrice || 0).toFixed(2)}
-                    </td>
-                    <td className="p-2">
-                      <div className="flex justify-center">
-                        <QRCode
-                          value={generateQRData(product)}
-                          size={40}
-                          style={{
-                            height: "auto",
-                            maxWidth: "100%",
-                            width: "100%",
-                          }}
-                        />
-                      </div>
-                    </td>
-                    <td className="p-2">
-                      <Dropdown
-                        overlay={
-                          <Menu
-                            items={[
-                              {
-                                key: "preview",
-                                icon: <EyeOutlined />,
-                                label: "প্রিভিউ দেখুন",
-                                onClick: () => {
-                                  setPreviewProduct(product);
-                                  setPreviewVisible(true);
-                                },
-                              },
-                              {
-                                key: "print",
-                                icon: <PrinterOutlined />,
-                                label: "প্রিন্ট করুন",
-                                onClick: () => handleSinglePrint(product),
-                              },
-                              {
-                                key: "download",
-                                icon: <DownloadOutlined />,
-                                label: "PNG ডাউনলোড",
-                                onClick: () => handleDownloadQR(product),
-                              },
-                              {
-                                key: "pdf",
-                                icon: <FilePdfOutlined />,
-                                label: "PDF ডাউনলোড",
-                                onClick: () => handleDownloadPDF([product]),
-                              },
-                            ]}
-                          />
-                        }
-                        trigger={["click"]}
-                      >
-                        <Button
-                          type="text"
-                          icon={<MoreOutlined />}
-                          size="small"
-                        />
-                      </Dropdown>
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
+                    প্রিন্ট
+                  </Button>
+                  <Button
+                    type="primary"
+                    icon={<FilePdfOutlined />}
+                    onClick={handleDownloadPDF}
+                    size="small"
+                    className="bg-red-600 hover:bg-red-700"
+                    loading={loading}
+                  >
+                    PDF
+                  </Button>
+                </>
+              )}
+              <Button
+                onClick={() => setSelectedProducts([])}
+                size="small"
+                danger
+              >
+                বাতিল
+              </Button>
+            </Space>
+          </div>
         </div>
+      )}
+
+      {/* Products Table/Grid */}
+      <Card className="shadow-lg border-0 mb-6">
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <Spin size="large" />
+          </div>
+        ) : isMobile && mobileView === "grid" ? (
+          <MobileGridView />
+        ) : (
+          <div className="overflow-x-auto">
+            <Table
+              dataSource={filteredProducts}
+              columns={isMobile ? mobileColumns : desktopColumns}
+              pagination={false}
+              size={isMobile ? "small" : "middle"}
+              rowKey="productId"
+              scroll={isMobile ? { x: 500 } : undefined}
+              rowSelection={
+                isMobile
+                  ? null
+                  : {
+                      selectedRowKeys: selectedProducts.map((p) => p.productId),
+                      onChange: (selectedRowKeys, selectedRows) => {
+                        setSelectedProducts(selectedRows);
+                      },
+                      getCheckboxProps: (record) => ({
+                        name: record.productName,
+                      }),
+                    }
+              }
+            />
+          </div>
+        )}
 
         <div className="flex justify-center mt-4">
           <Pagination
@@ -875,14 +1100,81 @@ const QRCodePage = () => {
                 pageSize: pageSize || pagination.pageSize,
               })
             }
-            showSizeChanger
+            showSizeChanger={!isMobile}
             pageSizeOptions={["12", "24", "48", "96"]}
             showTotal={(total, range) =>
               `মোট ${total}টি পণ্যের মধ্যে ${range[0]}-${range[1]}টি দেখানো হচ্ছে`
             }
+            size={isMobile ? "small" : "default"}
+            responsive
           />
         </div>
       </Card>
+
+      {/* Mobile Filter Drawer */}
+      <Drawer
+        title="ফিল্টার অপশন"
+        placement="right"
+        onClose={() => setFilterDrawerVisible(false)}
+        open={filterDrawerVisible}
+        width={320}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">ক্যাটাগরি</label>
+            <Select
+              placeholder="ক্যাটাগরি নির্বাচন করুন"
+              value={filters.category}
+              onChange={(value) => setFilters({ ...filters, category: value })}
+              className="w-full"
+              allowClear
+              size="large"
+            >
+              {categories.map((category) => (
+                <Option
+                  key={category.categoryCode}
+                  value={category.categoryCode}
+                >
+                  {category.categoryName}
+                </Option>
+              ))}
+            </Select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              তারিখ রেঞ্জ
+            </label>
+            <RangePicker
+              className="w-full"
+              placeholder={["শুরুর তারিখ", "শেষ তারিখ"]}
+              value={filters.dateRange}
+              onChange={(dates) => setFilters({ ...filters, dateRange: dates })}
+              format="DD/MM/YYYY"
+              size="large"
+            />
+          </div>
+
+          <div className="flex gap-2 pt-4">
+            <Button
+              onClick={resetFilters}
+              danger
+              className="flex-1"
+              size="large"
+            >
+              রিসেট
+            </Button>
+            <Button
+              type="primary"
+              onClick={applyFiltersAndClose}
+              className="flex-1"
+              size="large"
+            >
+              প্রয়োগ করুন
+            </Button>
+          </div>
+        </div>
+      </Drawer>
 
       {/* QR Code Preview Modal */}
       <Modal
@@ -893,6 +1185,7 @@ const QRCodePage = () => {
           <Button
             key="download"
             onClick={() => handleDownloadQR(previewProduct)}
+            size={isMobile ? "small" : "middle"}
           >
             <DownloadOutlined /> PNG ডাউনলোড
           </Button>,
@@ -902,6 +1195,7 @@ const QRCodePage = () => {
               handleDownloadPDF([previewProduct]);
               setPreviewVisible(false);
             }}
+            size={isMobile ? "small" : "middle"}
           >
             <FilePdfOutlined /> PDF ডাউনলোড
           </Button>,
@@ -912,11 +1206,12 @@ const QRCodePage = () => {
               handleSinglePrint(previewProduct);
               setPreviewVisible(false);
             }}
+            size={isMobile ? "small" : "middle"}
           >
             <PrinterOutlined /> প্রিন্ট
           </Button>,
         ]}
-        width={400}
+        width={isMobile ? "90vw" : 400}
         centered
       >
         {previewProduct && (
@@ -925,12 +1220,12 @@ const QRCodePage = () => {
               <QRCode
                 id={`qr-svg-preview-${previewProduct.productId}`}
                 value={generateQRData(previewProduct)}
-                size={200}
+                size={isMobile ? 150 : 200}
                 style={{ height: "auto", maxWidth: "100%", width: "100%" }}
               />
             </div>
             <div className="mt-4">
-              <h3 className="font-semibold text-lg mb-1">
+              <h3 className="font-semibold text-lg mb-1 truncate">
                 {previewProduct.productName}
               </h3>
               <p className="text-gray-600 mb-1">
@@ -950,46 +1245,42 @@ const QRCodePage = () => {
         )}
       </Modal>
 
-      {/* Quick Actions */}
-      {selectedProducts.length > 0 && (
-        <div className="fixed bottom-6 right-6 z-50 no-print">
-          <Card className="shadow-2xl border-0" bodyStyle={{ padding: "12px" }}>
-            <Space direction="vertical">
-              <div className="text-center">
-                <div className="text-sm font-semibold text-gray-700">
-                  {selectedProducts.length}টি পণ্য নির্বাচিত
-                </div>
-              </div>
-              <Space>
-                <Button
-                  type="primary"
-                  icon={<PrinterOutlined />}
-                  onClick={handleBulkPrint}
-                  size="small"
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  প্রিন্ট
-                </Button>
-                <Button
-                  type="primary"
-                  icon={<FilePdfOutlined />}
-                  onClick={handleDownloadPDF}
-                  size="small"
-                  className="bg-red-600 hover:bg-red-700"
-                  loading={loading}
-                >
-                  PDF
-                </Button>
-                <Button
-                  onClick={() => setSelectedProducts([])}
-                  size="small"
-                  danger
-                >
-                  বাতিল
-                </Button>
-              </Space>
-            </Space>
-          </Card>
+      {/* Mobile Floating Action Button */}
+      {isMobile && selectedProducts.length > 0 && (
+        <div className="fixed bottom-20 right-4 z-50 no-print">
+          <div className="bg-white rounded-full shadow-2xl p-2">
+            <Dropdown
+              overlay={
+                <Menu
+                  items={[
+                    {
+                      key: "print",
+                      icon: <PrinterOutlined />,
+                      label: "প্রিন্ট করুন",
+                      onClick: handleBulkPrint,
+                    },
+                    {
+                      key: "pdf",
+                      icon: <FilePdfOutlined />,
+                      label: "PDF ডাউনলোড",
+                      onClick: handleDownloadPDF,
+                    },
+                  ]}
+                />
+              }
+              trigger={["click"]}
+              placement="topRight"
+            >
+              <Button
+                type="primary"
+                shape="circle"
+                size="large"
+                className="bg-blue-600 hover:bg-blue-700 w-12 h-12 flex items-center justify-center"
+              >
+                <MoreOutlined className="text-white" />
+              </Button>
+            </Dropdown>
+          </div>
         </div>
       )}
     </div>

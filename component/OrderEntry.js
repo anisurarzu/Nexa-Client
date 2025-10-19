@@ -19,12 +19,18 @@ import {
   Space,
   InputNumber,
   Modal,
+  Tooltip,
+  Statistic,
 } from "antd";
 import {
   QrcodeOutlined,
   LoadingOutlined,
   PlusOutlined,
   DeleteOutlined,
+  ShoppingCartOutlined,
+  UserOutlined,
+  PhoneOutlined,
+  HomeOutlined,
 } from "@ant-design/icons";
 import { Html5Qrcode } from "html5-qrcode";
 import coreAxios from "@/utils/axiosInstance";
@@ -39,11 +45,15 @@ const OrderEntry = () => {
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [orderItems, setOrderItems] = useState([]);
-  const [scannedProduct, setScannedProduct] = useState(null);
+
+  // Modal states
+  const [addOrderModalVisible, setAddOrderModalVisible] = useState(false);
+  const [scanModalVisible, setScanModalVisible] = useState(false);
 
   const scannerRef = useRef(null);
   const scannerId = "order-qr-reader";
-  const [form] = Form.useForm();
+  const [addOrderForm] = Form.useForm();
+  const [scanForm] = Form.useForm();
 
   // Customer form fields
   const [customerInfo, setCustomerInfo] = useState({
@@ -127,12 +137,7 @@ const OrderEntry = () => {
       try {
         await scannerRef.current.stop();
         setScanning(false);
-        const productId = parseQRCode(decodedText);
-        if (productId) {
-          await fetchProductDetails(productId);
-        } else {
-          message.error("অবৈধ QR কোড! সঠিক পণ্য QR কোড স্ক্যান করুন।");
-        }
+        await fetchProductDetails(decodedText);
       } catch (err) {
         console.error("Error handling scan:", err);
         message.error("পণ্য স্ক্যান করতে ব্যর্থ হয়েছে");
@@ -167,10 +172,23 @@ const OrderEntry = () => {
   const fetchProductDetails = async (productId) => {
     setLoading(true);
     try {
-      const response = await coreAxios.get(`/products/${productId}`);
+      const parsedProductId = parseQRCode(productId);
+      const response = await coreAxios.get(`/products/${parsedProductId}`);
       if (response.data.success) {
         const productData = response.data.product;
-        setScannedProduct(productData);
+
+        // Pre-fill the scan form with product details
+        scanForm.setFieldsValue({
+          productId: productData.productId,
+          productName: productData.productName,
+          category: productData.category,
+          unitPrice: productData.unitPrice,
+          salePrice: productData.unitPrice,
+          quantity: 1,
+          vat: 0,
+          tax: 0,
+        });
+
         message.success("পণ্য সফলভাবে স্ক্যান করা হয়েছে!");
       } else {
         message.error("পণ্য পাওয়া যায়নি!");
@@ -184,62 +202,18 @@ const OrderEntry = () => {
   };
 
   const startQRScanner = () => {
+    setScanModalVisible(true);
     setScanning(true);
     setCameraError(false);
   };
 
-  const addToOrder = () => {
-    if (!scannedProduct) {
-      message.error("কোন পণ্য স্ক্যান করা হয়নি!");
-      return;
-    }
-
-    const existingItemIndex = orderItems.findIndex(
-      (item) => item.productId === scannedProduct.productId
-    );
-
-    if (existingItemIndex > -1) {
-      const updatedItems = [...orderItems];
-      updatedItems[existingItemIndex].quantity += 1;
-      updatedItems[existingItemIndex].total =
-        updatedItems[existingItemIndex].quantity *
-        updatedItems[existingItemIndex].salePrice;
-      setOrderItems(updatedItems);
-    } else {
-      const newItem = {
-        key: Date.now(),
-        productId: scannedProduct.productId,
-        productName: scannedProduct.productName,
-        category: scannedProduct.category,
-        unitPrice: scannedProduct.unitPrice,
-        salePrice: scannedProduct.unitPrice, // Default sale price same as unit price
-        quantity: 1,
-        vat: 0,
-        tax: 0,
-        total: scannedProduct.unitPrice,
-      };
-      setOrderItems([...orderItems, newItem]);
-    }
-
-    setScannedProduct(null);
-    message.success("পণ্য অর্ডারে যোগ করা হয়েছে!");
-  };
-
-  const addManualProduct = (values) => {
-    const selectedProduct = products.find(
-      (p) => p.productId === values.productId
-    );
-    if (!selectedProduct) {
-      message.error("পণ্য নির্বাচন করুন!");
-      return;
-    }
-
+  const handleAddOrder = (values) => {
     const newItem = {
       key: Date.now(),
-      productId: selectedProduct.productId,
-      productName: selectedProduct.productName,
+      productId: values.productId,
+      productName: values.productName,
       category: values.category,
-      unitPrice: selectedProduct.unitPrice,
+      unitPrice: values.unitPrice,
       salePrice: values.salePrice,
       quantity: values.quantity,
       vat: values.vat || 0,
@@ -251,8 +225,33 @@ const OrderEntry = () => {
     };
 
     setOrderItems([...orderItems, newItem]);
-    form.resetFields();
+    addOrderForm.resetFields();
+    setAddOrderModalVisible(false);
     message.success("পণ্য অর্ডারে যোগ করা হয়েছে!");
+  };
+
+  const handleScanOrder = (values) => {
+    const newItem = {
+      key: Date.now(),
+      productId: values.productId,
+      productName: values.productName,
+      category: values.category,
+      unitPrice: values.unitPrice,
+      salePrice: values.salePrice,
+      quantity: values.quantity,
+      vat: values.vat || 0,
+      tax: values.tax || 0,
+      total:
+        values.salePrice * values.quantity +
+        (values.vat || 0) +
+        (values.tax || 0),
+    };
+
+    setOrderItems([...orderItems, newItem]);
+    scanForm.resetFields();
+    setScanModalVisible(false);
+    setScanning(false);
+    message.success("স্ক্যান করা পণ্য অর্ডারে যোগ করা হয়েছে!");
   };
 
   const removeOrderItem = (key) => {
@@ -318,7 +317,6 @@ const OrderEntry = () => {
       // Reset form
       setCustomerInfo({ name: "", phone: "", address: "" });
       setOrderItems([]);
-      setScannedProduct(null);
     } catch (error) {
       console.error("Error creating order:", error);
       message.error("অর্ডার তৈরি করতে সমস্যা হয়েছে!");
@@ -332,17 +330,20 @@ const OrderEntry = () => {
       title: "পণ্যের নাম",
       dataIndex: "productName",
       key: "productName",
+      responsive: ["md"],
     },
     {
       title: "ক্যাটাগরি",
       dataIndex: "category",
       key: "category",
+      responsive: ["lg"],
     },
     {
       title: "ইউনিট প্রাইস",
       dataIndex: "unitPrice",
       key: "unitPrice",
       render: (price) => `৳${price}`,
+      responsive: ["md"],
     },
     {
       title: "সেল প্রাইস",
@@ -355,6 +356,7 @@ const OrderEntry = () => {
           onChange={(value) => updateOrderItem(record.key, "salePrice", value)}
           formatter={(value) => `৳ ${value}`}
           parser={(value) => value.replace("৳ ", "")}
+          size="small"
         />
       ),
     },
@@ -367,34 +369,7 @@ const OrderEntry = () => {
           min={1}
           value={quantity}
           onChange={(value) => updateOrderItem(record.key, "quantity", value)}
-        />
-      ),
-    },
-    {
-      title: "ভ্যাট",
-      dataIndex: "vat",
-      key: "vat",
-      render: (vat, record) => (
-        <InputNumber
-          min={0}
-          value={vat}
-          onChange={(value) => updateOrderItem(record.key, "vat", value)}
-          formatter={(value) => `৳ ${value}`}
-          parser={(value) => value.replace("৳ ", "")}
-        />
-      ),
-    },
-    {
-      title: "ট্যাক্স",
-      dataIndex: "tax",
-      key: "tax",
-      render: (tax, record) => (
-        <InputNumber
-          min={0}
-          value={tax}
-          onChange={(value) => updateOrderItem(record.key, "tax", value)}
-          formatter={(value) => `৳ ${value}`}
-          parser={(value) => value.replace("৳ ", "")}
+          size="small"
         />
       ),
     },
@@ -402,276 +377,486 @@ const OrderEntry = () => {
       title: "মোট",
       dataIndex: "total",
       key: "total",
-      render: (total) => `৳${total}`,
+      render: (total) => <Text strong>৳{total}</Text>,
     },
     {
       title: "কর্ম",
       key: "action",
       render: (_, record) => (
-        <Button
-          type="link"
-          danger
-          icon={<DeleteOutlined />}
-          onClick={() => removeOrderItem(record.key)}
-        >
-          মুছুন
-        </Button>
+        <Tooltip title="মুছুন">
+          <Button
+            type="text"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => removeOrderItem(record.key)}
+            size="small"
+          />
+        </Tooltip>
       ),
     },
   ];
 
   const totalAmount = orderItems.reduce((sum, item) => sum + item.total, 0);
+  const totalItems = orderItems.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4 pt-20">
+    <div className="min-h-screen bg-gray-50 py-4 px-4 pt-20">
       <div className="max-w-7xl mx-auto">
-        <Card className="shadow-lg border-gray-200">
-          <Title level={3} className="text-center mb-6 text-gray-800">
-            অর্ডার এন্ট্রি
+        {/* Header Section */}
+        <div className="mb-6">
+          <Title level={2} className="text-center mb-2 text-gray-800">
+            অর্ডার ম্যানেজমেন্ট
           </Title>
+          <Text className="text-center block text-gray-600">
+            নতুন অর্ডার তৈরি এবং ব্যবস্থাপনা করুন
+          </Text>
+        </div>
 
-          <Row gutter={24}>
-            {/* Left Column - Customer Info & Manual Entry */}
-            <Col xs={24} lg={12}>
-              {/* Customer Information */}
-              <Card title="গ্রাহকের তথ্য" className="mb-6">
-                <Space direction="vertical" className="w-full">
-                  <Input
-                    placeholder="গ্রাহকের নাম*"
-                    value={customerInfo.name}
-                    onChange={(e) =>
-                      setCustomerInfo({ ...customerInfo, name: e.target.value })
-                    }
-                    size="large"
-                  />
-                  <Input
-                    placeholder="ফোন নম্বর*"
-                    value={customerInfo.phone}
-                    onChange={(e) =>
-                      setCustomerInfo({
-                        ...customerInfo,
-                        phone: e.target.value,
-                      })
-                    }
-                    size="large"
-                  />
-                  <Input.TextArea
-                    placeholder="ঠিকানা"
-                    value={customerInfo.address}
-                    onChange={(e) =>
-                      setCustomerInfo({
-                        ...customerInfo,
-                        address: e.target.value,
-                      })
-                    }
-                    rows={3}
-                  />
-                </Space>
-              </Card>
-
-              {/* Manual Product Entry */}
-              <Card title="ম্যানুয়াল পণ্য এন্ট্রি">
-                <Form form={form} onFinish={addManualProduct} layout="vertical">
-                  <Form.Item
-                    name="category"
-                    label="ক্যাটাগরি"
-                    rules={[{ required: true }]}
-                  >
-                    <Select
-                      placeholder="ক্যাটাগরি নির্বাচন করুন"
-                      onChange={fetchProductsByCategory}
-                      size="large"
-                    >
-                      {categories.map((category) => (
-                        <Option
-                          key={category.categoryCode}
-                          value={category.categoryCode}
-                        >
-                          {category.categoryName}
-                        </Option>
-                      ))}
-                    </Select>
-                  </Form.Item>
-
-                  <Form.Item
-                    name="productId"
-                    label="পণ্য"
-                    rules={[{ required: true }]}
-                  >
-                    <Select placeholder="পণ্য নির্বাচন করুন" size="large">
-                      {products.map((product) => (
-                        <Option
-                          key={product.productId}
-                          value={product.productId}
-                        >
-                          {product.productName} - ৳{product.unitPrice}
-                        </Option>
-                      ))}
-                    </Select>
-                  </Form.Item>
-
-                  <Row gutter={16}>
-                    <Col span={12}>
-                      <Form.Item
-                        name="salePrice"
-                        label="সেল প্রাইস"
-                        rules={[{ required: true }]}
-                      >
-                        <InputNumber
-                          placeholder="সেল প্রাইস"
-                          className="w-full"
-                          min={1}
-                          formatter={(value) => `৳ ${value}`}
-                          parser={(value) => value.replace("৳ ", "")}
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col span={12}>
-                      <Form.Item
-                        name="quantity"
-                        label="পরিমাণ"
-                        rules={[{ required: true }]}
-                      >
-                        <InputNumber
-                          placeholder="পরিমাণ"
-                          className="w-full"
-                          min={1}
-                          defaultValue={1}
-                        />
-                      </Form.Item>
-                    </Col>
-                  </Row>
-
-                  <Row gutter={16}>
-                    <Col span={12}>
-                      <Form.Item name="vat" label="ভ্যাট">
-                        <InputNumber
-                          placeholder="ভ্যাট"
-                          className="w-full"
-                          min={0}
-                          formatter={(value) => `৳ ${value}`}
-                          parser={(value) => value.replace("৳ ", "")}
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col span={12}>
-                      <Form.Item name="tax" label="ট্যাক্স">
-                        <InputNumber
-                          placeholder="ট্যাক্স"
-                          className="w-full"
-                          min={0}
-                          formatter={(value) => `৳ ${value}`}
-                          parser={(value) => value.replace("৳ ", "")}
-                        />
-                      </Form.Item>
-                    </Col>
-                  </Row>
-
-                  <Button
-                    type="primary"
-                    htmlType="submit"
-                    icon={<PlusOutlined />}
-                    className="w-full"
-                  >
-                    পণ্য যোগ করুন
-                  </Button>
-                </Form>
-              </Card>
-            </Col>
-
-            {/* Right Column - QR Scanner & Order Summary */}
-            <Col xs={24} lg={12}>
-              {/* QR Scanner Section */}
-              <Card title="QR কোড স্ক্যানার" className="mb-6">
-                <div className="text-center mb-4">
-                  <Button
-                    type="dashed"
-                    size="large"
-                    icon={<QrcodeOutlined />}
-                    onClick={startQRScanner}
-                    className="w-full"
-                    style={{ height: "50px", fontSize: "16px" }}
-                  >
-                    📱 QR কোড স্ক্যান করুন
-                  </Button>
-                </div>
-
-                {scanning && (
-                  <div className="mb-4">
-                    {cameraError ? (
-                      <Alert
-                        message="ক্যামেরা অ্যাক্সেস ব্যর্থ হয়েছে"
-                        type="error"
-                      />
-                    ) : (
-                      <div className="w-full h-[250px] border rounded bg-gray-50 flex items-center justify-center">
-                        <div id={scannerId} className="w-full h-full" />
-                      </div>
-                    )}
-                    <div className="text-center mt-2">
-                      <Button onClick={() => setScanning(false)}>
-                        স্ক্যান বাতিল করুন
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {scannedProduct && (
-                  <div className="p-4 border rounded bg-green-50">
-                    <Title level={5}>স্ক্যান করা পণ্য:</Title>
-                    <Descriptions size="small" column={1}>
-                      <Descriptions.Item label="পণ্যের নাম">
-                        {scannedProduct.productName}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="ক্যাটাগরি">
-                        {scannedProduct.category}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="ইউনিট প্রাইস">
-                        ৳{scannedProduct.unitPrice}
-                      </Descriptions.Item>
-                    </Descriptions>
-                    <Button
-                      type="primary"
-                      onClick={addToOrder}
-                      className="w-full mt-2"
-                    >
-                      অর্ডারে যোগ করুন
-                    </Button>
-                  </div>
-                )}
-              </Card>
-
-              {/* Order Summary */}
-              <Card title="অর্ডার সামারি">
-                <Table
-                  columns={columns}
-                  dataSource={orderItems}
-                  pagination={false}
-                  scroll={{ x: 800 }}
-                  size="small"
-                />
-
-                <Divider />
-
-                <div className="text-right">
-                  <Title level={4}>মোট Amount: ৳{totalAmount}</Title>
-                </div>
-
+        <Card className="shadow-lg border-0 rounded-xl">
+          {/* Action Buttons */}
+          <div className="mb-6">
+            <Row gutter={16} justify="center">
+              <Col xs={24} sm={8} md={6} className="mb-3">
                 <Button
                   type="primary"
+                  icon={<PlusOutlined />}
                   size="large"
-                  onClick={submitOrder}
-                  loading={loading}
-                  className="w-full"
-                  disabled={orderItems.length === 0}
+                  onClick={() => setAddOrderModalVisible(true)}
+                  className="w-full h-12"
                 >
-                  অর্ডার সাবমিট করুন
+                  নতুন অর্ডার
                 </Button>
-              </Card>
-            </Col>
-          </Row>
+              </Col>
+              <Col xs={24} sm={8} md={6} className="mb-3">
+                <Button
+                  icon={<QrcodeOutlined />}
+                  size="large"
+                  onClick={startQRScanner}
+                  className="w-full h-12"
+                >
+                  QR স্ক্যান করুন
+                </Button>
+              </Col>
+            </Row>
+          </div>
+
+          {/* Customer Information */}
+          <Card
+            title={
+              <span>
+                <UserOutlined className="mr-2" />
+                গ্রাহকের তথ্য
+              </span>
+            }
+            className="mb-6"
+            size="small"
+          >
+            <Row gutter={16}>
+              <Col xs={24} md={8} className="mb-3">
+                <Input
+                  placeholder="গ্রাহকের নাম*"
+                  prefix={<UserOutlined />}
+                  value={customerInfo.name}
+                  onChange={(e) =>
+                    setCustomerInfo({ ...customerInfo, name: e.target.value })
+                  }
+                  size="large"
+                />
+              </Col>
+              <Col xs={24} md={8} className="mb-3">
+                <Input
+                  placeholder="ফোন নম্বর*"
+                  prefix={<PhoneOutlined />}
+                  value={customerInfo.phone}
+                  onChange={(e) =>
+                    setCustomerInfo({
+                      ...customerInfo,
+                      phone: e.target.value,
+                    })
+                  }
+                  size="large"
+                />
+              </Col>
+              <Col xs={24} md={8} className="mb-3">
+                <Input
+                  placeholder="ঠিকানা"
+                  prefix={<HomeOutlined />}
+                  value={customerInfo.address}
+                  onChange={(e) =>
+                    setCustomerInfo({
+                      ...customerInfo,
+                      address: e.target.value,
+                    })
+                  }
+                  size="large"
+                />
+              </Col>
+            </Row>
+          </Card>
+
+          {/* Order Summary Stats */}
+          {orderItems.length > 0 && (
+            <div className="mb-6">
+              <Row gutter={16}>
+                <Col xs={12} sm={6}>
+                  <Card size="small" className="text-center">
+                    <Statistic
+                      title="মোট পণ্য"
+                      value={orderItems.length}
+                      prefix={<ShoppingCartOutlined />}
+                    />
+                  </Card>
+                </Col>
+                <Col xs={12} sm={6}>
+                  <Card size="small" className="text-center">
+                    <Statistic title="মোট আইটেম" value={totalItems} />
+                  </Card>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Card size="small" className="text-center">
+                    <Statistic
+                      title="মোট Amount"
+                      value={totalAmount}
+                      precision={2}
+                      prefix="৳"
+                      valueStyle={{ color: "#3f8600" }}
+                    />
+                  </Card>
+                </Col>
+              </Row>
+            </div>
+          )}
+
+          {/* Order Items Table */}
+          <Card title={`অর্ডার আইটেম (${orderItems.length})`} className="mb-6">
+            {orderItems.length === 0 ? (
+              <div className="text-center py-8">
+                <ShoppingCartOutlined className="text-4xl text-gray-400 mb-4" />
+                <Title level={4} className="text-gray-500">
+                  কোন অর্ডার আইটেম নেই
+                </Title>
+                <Text className="text-gray-400">
+                  নতুন অর্ডার যোগ করতে উপরের বাটন ব্যবহার করুন
+                </Text>
+              </div>
+            ) : (
+              <Table
+                columns={columns}
+                dataSource={orderItems}
+                pagination={false}
+                scroll={{ x: 800 }}
+                size="middle"
+                className="order-table"
+              />
+            )}
+          </Card>
+
+          {/* Submit Order Button */}
+          {orderItems.length > 0 && (
+            <div className="text-center">
+              <Button
+                type="primary"
+                size="large"
+                onClick={submitOrder}
+                loading={loading}
+                className="min-w-48 h-12 text-lg"
+                disabled={!customerInfo.name || !customerInfo.phone}
+              >
+                অর্ডার কনফার্ম করুন
+              </Button>
+            </div>
+          )}
         </Card>
+
+        {/* Add Order Modal */}
+        <Modal
+          title="নতুন অর্ডার যোগ করুন"
+          open={addOrderModalVisible}
+          onCancel={() => setAddOrderModalVisible(false)}
+          footer={null}
+          width={700}
+          centered
+        >
+          <Form
+            form={addOrderForm}
+            onFinish={handleAddOrder}
+            layout="vertical"
+            className="mt-4"
+          >
+            <Row gutter={16}>
+              <Col xs={24} md={12}>
+                <Form.Item
+                  name="category"
+                  label="ক্যাটাগরি"
+                  rules={[
+                    { required: true, message: "ক্যাটাগরি নির্বাচন করুন" },
+                  ]}
+                >
+                  <Select
+                    placeholder="ক্যাটাগরি নির্বাচন করুন"
+                    onChange={fetchProductsByCategory}
+                    size="large"
+                  >
+                    {categories.map((category) => (
+                      <Option
+                        key={category.categoryCode}
+                        value={category.categoryCode}
+                      >
+                        {category.categoryName}
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item
+                  name="productId"
+                  label="পণ্য"
+                  rules={[{ required: true, message: "পণ্য নির্বাচন করুন" }]}
+                >
+                  <Select
+                    placeholder="পণ্য নির্বাচন করুন"
+                    size="large"
+                    showSearch
+                    filterOption={(input, option) =>
+                      option.children
+                        .toLowerCase()
+                        .indexOf(input.toLowerCase()) >= 0
+                    }
+                  >
+                    {products.map((product) => (
+                      <Option key={product.productId} value={product.productId}>
+                        {product.productName} - ৳{product.unitPrice}
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Row gutter={16}>
+              <Col xs={24} md={8}>
+                <Form.Item
+                  name="unitPrice"
+                  label="ইউনিট প্রাইস"
+                  rules={[{ required: true, message: "ইউনিট প্রাইস লিখুন" }]}
+                >
+                  <InputNumber
+                    placeholder="ইউনিট প্রাইস"
+                    className="w-full"
+                    min={1}
+                    formatter={(value) => `৳ ${value}`}
+                    parser={(value) => value.replace("৳ ", "")}
+                    size="large"
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={8}>
+                <Form.Item
+                  name="salePrice"
+                  label="সেল প্রাইস"
+                  rules={[{ required: true, message: "সেল প্রাইস লিখুন" }]}
+                >
+                  <InputNumber
+                    placeholder="সেল প্রাইস"
+                    className="w-full"
+                    min={1}
+                    formatter={(value) => `৳ ${value}`}
+                    parser={(value) => value.replace("৳ ", "")}
+                    size="large"
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={8}>
+                <Form.Item
+                  name="quantity"
+                  label="পরিমাণ"
+                  rules={[{ required: true, message: "পরিমাণ লিখুন" }]}
+                >
+                  <InputNumber
+                    placeholder="পরিমাণ"
+                    className="w-full"
+                    min={1}
+                    defaultValue={1}
+                    size="large"
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Row gutter={16}>
+              <Col xs={24} md={12}>
+                <Form.Item name="vat" label="ভ্যাট">
+                  <InputNumber
+                    placeholder="ভ্যাট"
+                    className="w-full"
+                    min={0}
+                    formatter={(value) => `৳ ${value}`}
+                    parser={(value) => value.replace("৳ ", "")}
+                    size="large"
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item name="tax" label="ট্যাক্স">
+                  <InputNumber
+                    placeholder="ট্যাক্স"
+                    className="w-full"
+                    min={0}
+                    formatter={(value) => `৳ ${value}`}
+                    parser={(value) => value.replace("৳ ", "")}
+                    size="large"
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <div className="text-right">
+              <Button
+                onClick={() => setAddOrderModalVisible(false)}
+                className="mr-2"
+                size="large"
+              >
+                বাতিল
+              </Button>
+              <Button
+                type="primary"
+                htmlType="submit"
+                size="large"
+                icon={<PlusOutlined />}
+              >
+                অর্ডার যোগ করুন
+              </Button>
+            </div>
+          </Form>
+        </Modal>
+
+        {/* Scan Modal */}
+        <Modal
+          title="QR কোড স্ক্যান করুন"
+          open={scanModalVisible}
+          onCancel={() => {
+            setScanModalVisible(false);
+            setScanning(false);
+            if (scannerRef.current && scannerRef.current.isScanning) {
+              scannerRef.current.stop().catch(() => {});
+            }
+          }}
+          footer={null}
+          width={700}
+          centered
+        >
+          <div className="mb-4">
+            {scanning && (
+              <div className="mb-4">
+                {cameraError ? (
+                  <Alert
+                    message="ক্যামেরা অ্যাক্সেস ব্যর্থ হয়েছে"
+                    description="আপনার ব্রাউজারে ক্যামেরা অনুমতি প্রদান করুন"
+                    type="error"
+                  />
+                ) : (
+                  <div className="w-full h-[300px] border-2 border-dashed border-blue-300 rounded-lg bg-gray-50 flex items-center justify-center">
+                    <div id={scannerId} className="w-full h-full" />
+                  </div>
+                )}
+                <div className="text-center mt-4">
+                  <Text className="text-gray-600">
+                    QR কোড স্ক্যান করার জন্য ক্যামেরার দিকে ধরুন
+                  </Text>
+                </div>
+              </div>
+            )}
+
+            <Form form={scanForm} onFinish={handleScanOrder} layout="vertical">
+              <Row gutter={16}>
+                <Col xs={24} md={12}>
+                  <Form.Item name="productName" label="পণ্যের নাম">
+                    <Input size="large" readOnly />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item name="category" label="ক্যাটাগরি">
+                    <Input size="large" readOnly />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Row gutter={16}>
+                <Col xs={24} md={8}>
+                  <Form.Item name="unitPrice" label="ইউনিট প্রাইস">
+                    <InputNumber
+                      className="w-full"
+                      formatter={(value) => `৳ ${value}`}
+                      parser={(value) => value.replace("৳ ", "")}
+                      size="large"
+                      readOnly
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={8}>
+                  <Form.Item
+                    name="salePrice"
+                    label="সেল প্রাইস"
+                    rules={[{ required: true, message: "সেল প্রাইস লিখুন" }]}
+                  >
+                    <InputNumber
+                      className="w-full"
+                      min={1}
+                      formatter={(value) => `৳ ${value}`}
+                      parser={(value) => value.replace("৳ ", "")}
+                      size="large"
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={8}>
+                  <Form.Item
+                    name="quantity"
+                    label="পরিমাণ"
+                    rules={[{ required: true, message: "পরিমাণ লিখুন" }]}
+                  >
+                    <InputNumber
+                      className="w-full"
+                      min={1}
+                      defaultValue={1}
+                      size="large"
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <div className="text-right">
+                <Button
+                  onClick={() => {
+                    setScanModalVisible(false);
+                    setScanning(false);
+                  }}
+                  className="mr-2"
+                  size="large"
+                >
+                  বাতিল
+                </Button>
+                <Button type="primary" htmlType="submit" size="large">
+                  অর্ডার যোগ করুন
+                </Button>
+              </div>
+            </Form>
+          </div>
+        </Modal>
       </div>
+
+      <style jsx>{`
+        @media (max-width: 768px) {
+          :global(.order-table .ant-table-thead > tr > th) {
+            font-size: 12px;
+            padding: 8px 4px;
+          }
+          :global(.order-table .ant-table-tbody > tr > td) {
+            font-size: 12px;
+            padding: 8px 4px;
+          }
+        }
+      `}</style>
     </div>
   );
 };

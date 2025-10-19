@@ -76,7 +76,7 @@ const rolePermissions = {
     },
     {
       key: "7",
-      label: "ইনভেন্টরি",
+      label: "নতুন পণ্য",
       icon: <InboxOutlined />,
     },
     {
@@ -108,7 +108,7 @@ const rolePermissions = {
     },
     {
       key: "7",
-      label: "ইনভেন্টরি",
+      label: "নতুন পণ্য",
       icon: <InboxOutlined />,
     },
     {
@@ -135,7 +135,7 @@ const rolePermissions = {
     },
     {
       key: "7",
-      label: "ইনভেন্টরি",
+      label: "নতুন পণ্য",
       icon: <InboxOutlined />,
     },
     {
@@ -162,7 +162,7 @@ const rolePermissions = {
     },
     {
       key: "7",
-      label: "ইনভেন্টরি",
+      label: "নতুন পণ্য",
       icon: <InboxOutlined />,
     },
     {
@@ -806,10 +806,10 @@ const InventoryManagement = () => (
     <div className="text-center py-8">
       <InboxOutlined className="text-6xl text-green-500 mb-4" />
       <Title level={3} className="text-gray-800">
-        ইনভেন্টরি ব্যবস্থাপনা
+        নতুন পণ্য ব্যবস্থাপনা
       </Title>
       <Text className="text-gray-600 text-lg">
-        ইনভেন্টরি ব্যবস্থাপনা বিষয়বস্তু এখানে থাকবে
+        নতুন পণ্য ব্যবস্থাপনা বিষয়বস্তু এখানে থাকবে
       </Text>
     </div>
   </Card>
@@ -976,7 +976,7 @@ const Dashboard = () => {
             {!collapsed && (
               <div className="ml-3">
                 <div className="text-lg font-bold text-[#2e7d32]">Nexa</div>
-                <div className="text-xs text-gray-600 -mt-1">ইনভেন্টরি</div>
+                <div className="text-xs text-gray-600 -mt-1">নতুন পণ্য</div>
               </div>
             )}
           </div>
@@ -996,7 +996,7 @@ const Dashboard = () => {
             />
             <div>
               <div className="text-lg font-bold text-white">Nexa</div>
-              <div className="text-xs text-gray-200 -mt-1">ইনভেন্টরি</div>
+              <div className="text-xs text-gray-200 -mt-1">নতুন পণ্য</div>
             </div>
           </div>
         }
