@@ -13,22 +13,73 @@ import {
   Row,
   Col,
   Image,
+  Select,
+  Form,
+  Table,
+  Space,
+  InputNumber,
+  Modal,
 } from "antd";
-import { QrcodeOutlined, LoadingOutlined } from "@ant-design/icons";
+import {
+  QrcodeOutlined,
+  LoadingOutlined,
+  PlusOutlined,
+  DeleteOutlined,
+} from "@ant-design/icons";
 import { Html5Qrcode } from "html5-qrcode";
 import coreAxios from "@/utils/axiosInstance";
 
 const { Title, Text } = Typography;
+const { Option } = Select;
 
-const ProductQRScanner = () => {
-  const [step, setStep] = useState(1);
+const OrderEntry = () => {
   const [loading, setLoading] = useState(false);
-  const [productDetails, setProductDetails] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [cameraError, setCameraError] = useState(false);
-  const scannerRef = useRef(null);
-  const scannerId = "product-qr-reader";
+  const [categories, setCategories] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [orderItems, setOrderItems] = useState([]);
+  const [scannedProduct, setScannedProduct] = useState(null);
 
+  const scannerRef = useRef(null);
+  const scannerId = "order-qr-reader";
+  const [form] = Form.useForm();
+
+  // Customer form fields
+  const [customerInfo, setCustomerInfo] = useState({
+    name: "",
+    phone: "",
+    address: "",
+  });
+
+  // Fetch categories on component mount
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  const fetchCategories = async () => {
+    try {
+      const response = await coreAxios.get("/categories");
+      setCategories(response.data || []);
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+      message.error("ক্যাটাগরি লোড করতে সমস্যা হয়েছে");
+    }
+  };
+
+  const fetchProductsByCategory = async (categoryCode) => {
+    try {
+      const response = await coreAxios.get(
+        `/products/category/${categoryCode}`
+      );
+      setProducts(response.data?.products || []);
+    } catch (error) {
+      console.error("Error fetching products:", error);
+      message.error("পণ্য লোড করতে সমস্যা হয়েছে");
+    }
+  };
+
+  // QR Scanner Logic
   useEffect(() => {
     if (!scanning) return;
 
@@ -74,19 +125,11 @@ const ProductQRScanner = () => {
 
     const handleScanSuccess = async (decodedText) => {
       try {
-        // Stop scanner
         await scannerRef.current.stop();
         setScanning(false);
-
-        // Process the scanned product ID
         const productId = parseQRCode(decodedText);
         if (productId) {
-          const details = await fetchProductDetails(productId);
-          if (details) {
-            setProductDetails(details);
-            setStep(2);
-            message.success("পণ্য আইডি সফলভাবে স্ক্যান করা হয়েছে!");
-          }
+          await fetchProductDetails(productId);
         } else {
           message.error("অবৈধ QR কোড! সঠিক পণ্য QR কোড স্ক্যান করুন।");
         }
@@ -106,20 +149,16 @@ const ProductQRScanner = () => {
     };
   }, [scanning]);
 
-  // Parse QR code data to extract product ID
   const parseQRCode = (qrData) => {
     try {
-      // Try to parse as JSON first
       const productData = JSON.parse(qrData);
       return productData.productId || productData.id || productData.product_id;
     } catch (e) {
-      // If JSON parsing fails, try to extract product ID from string
       if (qrData.includes("productId:")) {
         return parseInt(qrData.split("productId:")[1]);
       } else if (qrData.includes("id=")) {
         return parseInt(qrData.split("id=")[1]);
       }
-      // If it's just a number, parse it directly
       const parsedId = parseInt(qrData);
       return isNaN(parsedId) ? null : parsedId;
     }
@@ -129,52 +168,19 @@ const ProductQRScanner = () => {
     setLoading(true);
     try {
       const response = await coreAxios.get(`/products/${productId}`);
-      const productData = response.data;
-
-      if (productData) {
-        return {
-          productId: productData.productId,
-          productName: productData.productName,
-          description: productData.description,
-          category: productData.category,
-          unitPrice: productData.unitPrice,
-          stockQuantity: productData.stockQuantity,
-          status: productData.status,
-          image: productData.image,
-          createdAt: productData.createdAt,
-          updatedAt: productData.updatedAt,
-        };
+      if (response.data.success) {
+        const productData = response.data.product;
+        setScannedProduct(productData);
+        message.success("পণ্য সফলভাবে স্ক্যান করা হয়েছে!");
+      } else {
+        message.error("পণ্য পাওয়া যায়নি!");
       }
-      return null;
     } catch (error) {
       console.error("Error fetching product details:", error);
-      message.error("পণ্যের তথ্য পাওয়া যায়নি। আইডি চেক করুন।");
-      return null;
+      message.error("পণ্যের তথ্য পাওয়া যায়নি।");
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleProductIDSubmit = async (values) => {
-    try {
-      const productId = parseQRCode(values.productID);
-      if (productId) {
-        const details = await fetchProductDetails(productId);
-        if (details) {
-          setProductDetails(details);
-          setStep(2);
-        }
-      } else {
-        message.error("অবৈধ পণ্য আইডি ফরম্যাট!");
-      }
-    } catch (error) {
-      console.error("Error processing product details:", error);
-    }
-  };
-
-  const resetForm = () => {
-    setProductDetails(null);
-    setStep(1);
   };
 
   const startQRScanner = () => {
@@ -182,258 +188,492 @@ const ProductQRScanner = () => {
     setCameraError(false);
   };
 
-  const getStatusColor = (status) => {
-    const statusColors = {
-      active: "green",
-      inactive: "red",
-      outofstock: "orange",
-      discontinued: "gray",
-    };
-    return statusColors[status?.toLowerCase()] || "default";
+  const addToOrder = () => {
+    if (!scannedProduct) {
+      message.error("কোন পণ্য স্ক্যান করা হয়নি!");
+      return;
+    }
+
+    const existingItemIndex = orderItems.findIndex(
+      (item) => item.productId === scannedProduct.productId
+    );
+
+    if (existingItemIndex > -1) {
+      const updatedItems = [...orderItems];
+      updatedItems[existingItemIndex].quantity += 1;
+      updatedItems[existingItemIndex].total =
+        updatedItems[existingItemIndex].quantity *
+        updatedItems[existingItemIndex].salePrice;
+      setOrderItems(updatedItems);
+    } else {
+      const newItem = {
+        key: Date.now(),
+        productId: scannedProduct.productId,
+        productName: scannedProduct.productName,
+        category: scannedProduct.category,
+        unitPrice: scannedProduct.unitPrice,
+        salePrice: scannedProduct.unitPrice, // Default sale price same as unit price
+        quantity: 1,
+        vat: 0,
+        tax: 0,
+        total: scannedProduct.unitPrice,
+      };
+      setOrderItems([...orderItems, newItem]);
+    }
+
+    setScannedProduct(null);
+    message.success("পণ্য অর্ডারে যোগ করা হয়েছে!");
   };
 
-  const getStatusText = (status) => {
-    const statusTexts = {
-      active: "সক্রিয়",
-      inactive: "নিষ্ক্রিয়",
-      outofstock: "স্টক নেই",
-      discontinued: "বন্ধ",
+  const addManualProduct = (values) => {
+    const selectedProduct = products.find(
+      (p) => p.productId === values.productId
+    );
+    if (!selectedProduct) {
+      message.error("পণ্য নির্বাচন করুন!");
+      return;
+    }
+
+    const newItem = {
+      key: Date.now(),
+      productId: selectedProduct.productId,
+      productName: selectedProduct.productName,
+      category: values.category,
+      unitPrice: selectedProduct.unitPrice,
+      salePrice: values.salePrice,
+      quantity: values.quantity,
+      vat: values.vat || 0,
+      tax: values.tax || 0,
+      total:
+        values.salePrice * values.quantity +
+        (values.vat || 0) +
+        (values.tax || 0),
     };
-    return statusTexts[status?.toLowerCase()] || status;
+
+    setOrderItems([...orderItems, newItem]);
+    form.resetFields();
+    message.success("পণ্য অর্ডারে যোগ করা হয়েছে!");
   };
+
+  const removeOrderItem = (key) => {
+    setOrderItems(orderItems.filter((item) => item.key !== key));
+    message.success("পণ্য অর্ডার থেকে সরানো হয়েছে!");
+  };
+
+  const updateOrderItem = (key, field, value) => {
+    const updatedItems = orderItems.map((item) => {
+      if (item.key === key) {
+        const updatedItem = { ...item, [field]: value };
+
+        // Recalculate total if quantity or sale price changes
+        if (field === "quantity" || field === "salePrice") {
+          updatedItem.total =
+            updatedItem.salePrice * updatedItem.quantity +
+            updatedItem.vat +
+            updatedItem.tax;
+        }
+
+        // Recalculate total if vat or tax changes
+        if (field === "vat" || field === "tax") {
+          updatedItem.total =
+            updatedItem.salePrice * updatedItem.quantity +
+            updatedItem.vat +
+            updatedItem.tax;
+        }
+
+        return updatedItem;
+      }
+      return item;
+    });
+    setOrderItems(updatedItems);
+  };
+
+  const submitOrder = async () => {
+    if (!customerInfo.name || !customerInfo.phone) {
+      message.error("গ্রাহকের নাম এবং ফোন নম্বর প্রয়োজন!");
+      return;
+    }
+
+    if (orderItems.length === 0) {
+      message.error("অর্ডারে কমপক্ষে একটি পণ্য যোগ করুন!");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const orderData = {
+        customerName: customerInfo.name,
+        customerPhone: customerInfo.phone,
+        customerAddress: customerInfo.address,
+        items: orderItems,
+        totalAmount: orderItems.reduce((sum, item) => sum + item.total, 0),
+        orderDate: new Date().toISOString(),
+      };
+
+      // Here you would call your order creation API
+      console.log("Order Data:", orderData);
+
+      message.success("অর্ডার সফলভাবে তৈরি হয়েছে!");
+
+      // Reset form
+      setCustomerInfo({ name: "", phone: "", address: "" });
+      setOrderItems([]);
+      setScannedProduct(null);
+    } catch (error) {
+      console.error("Error creating order:", error);
+      message.error("অর্ডার তৈরি করতে সমস্যা হয়েছে!");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const columns = [
+    {
+      title: "পণ্যের নাম",
+      dataIndex: "productName",
+      key: "productName",
+    },
+    {
+      title: "ক্যাটাগরি",
+      dataIndex: "category",
+      key: "category",
+    },
+    {
+      title: "ইউনিট প্রাইস",
+      dataIndex: "unitPrice",
+      key: "unitPrice",
+      render: (price) => `৳${price}`,
+    },
+    {
+      title: "সেল প্রাইস",
+      dataIndex: "salePrice",
+      key: "salePrice",
+      render: (price, record) => (
+        <InputNumber
+          min={1}
+          value={price}
+          onChange={(value) => updateOrderItem(record.key, "salePrice", value)}
+          formatter={(value) => `৳ ${value}`}
+          parser={(value) => value.replace("৳ ", "")}
+        />
+      ),
+    },
+    {
+      title: "পরিমাণ",
+      dataIndex: "quantity",
+      key: "quantity",
+      render: (quantity, record) => (
+        <InputNumber
+          min={1}
+          value={quantity}
+          onChange={(value) => updateOrderItem(record.key, "quantity", value)}
+        />
+      ),
+    },
+    {
+      title: "ভ্যাট",
+      dataIndex: "vat",
+      key: "vat",
+      render: (vat, record) => (
+        <InputNumber
+          min={0}
+          value={vat}
+          onChange={(value) => updateOrderItem(record.key, "vat", value)}
+          formatter={(value) => `৳ ${value}`}
+          parser={(value) => value.replace("৳ ", "")}
+        />
+      ),
+    },
+    {
+      title: "ট্যাক্স",
+      dataIndex: "tax",
+      key: "tax",
+      render: (tax, record) => (
+        <InputNumber
+          min={0}
+          value={tax}
+          onChange={(value) => updateOrderItem(record.key, "tax", value)}
+          formatter={(value) => `৳ ${value}`}
+          parser={(value) => value.replace("৳ ", "")}
+        />
+      ),
+    },
+    {
+      title: "মোট",
+      dataIndex: "total",
+      key: "total",
+      render: (total) => `৳${total}`,
+    },
+    {
+      title: "কর্ম",
+      key: "action",
+      render: (_, record) => (
+        <Button
+          type="link"
+          danger
+          icon={<DeleteOutlined />}
+          onClick={() => removeOrderItem(record.key)}
+        >
+          মুছুন
+        </Button>
+      ),
+    },
+  ];
+
+  const totalAmount = orderItems.reduce((sum, item) => sum + item.total, 0);
 
   return (
-    <div className="min-h-screen bg-blue-50 py-8 px-4 pt-20">
-      <div className="max-w-4xl mx-auto">
-        <Card className="shadow-lg border-blue-200">
-          <Title level={3} className="text-center mb-6 text-blue-800">
-            পণ্য তথ্য স্ক্যানার
+    <div className="min-h-screen bg-gray-50 py-8 px-4 pt-20">
+      <div className="max-w-7xl mx-auto">
+        <Card className="shadow-lg border-gray-200">
+          <Title level={3} className="text-center mb-6 text-gray-800">
+            অর্ডার এন্ট্রি
           </Title>
 
-          <Alert
-            message="📌 কিভাবে স্ক্যান করবেন"
-            description={
-              <div className="text-blue-700">
-                <p className="mb-2">
-                  পণ্যের QR কোড স্ক্যান করে দ্রুত তথ্য দেখুন:
-                </p>
-                <ul className="pl-5 space-y-1">
-                  <li>
-                    <span className="font-bold">*</span> পণ্যের QR কোড ক্যামেরার
-                    সামনে ধরুন
-                  </li>
-                  <li>
-                    <span className="font-bold">*</span> অটোমেটিক স্ক্যান হবে
-                    এবং পণ্যের তথ্য দেখাবে
-                  </li>
-                  <li>
-                    <span className="font-bold">*</span> ম্যানুয়ালি পণ্য আইডি
-                    দিয়েও খুঁজতে পারেন
-                  </li>
-                </ul>
-              </div>
-            }
-            type="info"
-            showIcon
-            className="mb-6 border-blue-300 bg-blue-50"
-          />
+          <Row gutter={24}>
+            {/* Left Column - Customer Info & Manual Entry */}
+            <Col xs={24} lg={12}>
+              {/* Customer Information */}
+              <Card title="গ্রাহকের তথ্য" className="mb-6">
+                <Space direction="vertical" className="w-full">
+                  <Input
+                    placeholder="গ্রাহকের নাম*"
+                    value={customerInfo.name}
+                    onChange={(e) =>
+                      setCustomerInfo({ ...customerInfo, name: e.target.value })
+                    }
+                    size="large"
+                  />
+                  <Input
+                    placeholder="ফোন নম্বর*"
+                    value={customerInfo.phone}
+                    onChange={(e) =>
+                      setCustomerInfo({
+                        ...customerInfo,
+                        phone: e.target.value,
+                      })
+                    }
+                    size="large"
+                  />
+                  <Input.TextArea
+                    placeholder="ঠিকানা"
+                    value={customerInfo.address}
+                    onChange={(e) =>
+                      setCustomerInfo({
+                        ...customerInfo,
+                        address: e.target.value,
+                      })
+                    }
+                    rows={3}
+                  />
+                </Space>
+              </Card>
 
-          {scanning && (
-            <div className="mb-6">
-              <p className="text-center font-semibold text-blue-700 mb-2">
-                পণ্যের QR কোড স্ক্যান করুন
-              </p>
-              {cameraError ? (
-                <div className="text-center p-4 border rounded bg-gray-50">
-                  <p className="text-red-500 mb-2">
-                    ক্যামেরা অ্যাক্সেস ব্যর্থ হয়েছে
-                  </p>
+              {/* Manual Product Entry */}
+              <Card title="ম্যানুয়াল পণ্য এন্ট্রি">
+                <Form form={form} onFinish={addManualProduct} layout="vertical">
+                  <Form.Item
+                    name="category"
+                    label="ক্যাটাগরি"
+                    rules={[{ required: true }]}
+                  >
+                    <Select
+                      placeholder="ক্যাটাগরি নির্বাচন করুন"
+                      onChange={fetchProductsByCategory}
+                      size="large"
+                    >
+                      {categories.map((category) => (
+                        <Option
+                          key={category.categoryCode}
+                          value={category.categoryCode}
+                        >
+                          {category.categoryName}
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+
+                  <Form.Item
+                    name="productId"
+                    label="পণ্য"
+                    rules={[{ required: true }]}
+                  >
+                    <Select placeholder="পণ্য নির্বাচন করুন" size="large">
+                      {products.map((product) => (
+                        <Option
+                          key={product.productId}
+                          value={product.productId}
+                        >
+                          {product.productName} - ৳{product.unitPrice}
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+
+                  <Row gutter={16}>
+                    <Col span={12}>
+                      <Form.Item
+                        name="salePrice"
+                        label="সেল প্রাইস"
+                        rules={[{ required: true }]}
+                      >
+                        <InputNumber
+                          placeholder="সেল প্রাইস"
+                          className="w-full"
+                          min={1}
+                          formatter={(value) => `৳ ${value}`}
+                          parser={(value) => value.replace("৳ ", "")}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                      <Form.Item
+                        name="quantity"
+                        label="পরিমাণ"
+                        rules={[{ required: true }]}
+                      >
+                        <InputNumber
+                          placeholder="পরিমাণ"
+                          className="w-full"
+                          min={1}
+                          defaultValue={1}
+                        />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+
+                  <Row gutter={16}>
+                    <Col span={12}>
+                      <Form.Item name="vat" label="ভ্যাট">
+                        <InputNumber
+                          placeholder="ভ্যাট"
+                          className="w-full"
+                          min={0}
+                          formatter={(value) => `৳ ${value}`}
+                          parser={(value) => value.replace("৳ ", "")}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                      <Form.Item name="tax" label="ট্যাক্স">
+                        <InputNumber
+                          placeholder="ট্যাক্স"
+                          className="w-full"
+                          min={0}
+                          formatter={(value) => `৳ ${value}`}
+                          parser={(value) => value.replace("৳ ", "")}
+                        />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+
                   <Button
                     type="primary"
-                    onClick={() => {
-                      setCameraError(false);
-                      setScanning(true);
-                    }}
+                    htmlType="submit"
+                    icon={<PlusOutlined />}
+                    className="w-full"
                   >
-                    ক্যামেরা অ্যাক্সেস পুনরায় চেষ্টা করুন
+                    পণ্য যোগ করুন
+                  </Button>
+                </Form>
+              </Card>
+            </Col>
+
+            {/* Right Column - QR Scanner & Order Summary */}
+            <Col xs={24} lg={12}>
+              {/* QR Scanner Section */}
+              <Card title="QR কোড স্ক্যানার" className="mb-6">
+                <div className="text-center mb-4">
+                  <Button
+                    type="dashed"
+                    size="large"
+                    icon={<QrcodeOutlined />}
+                    onClick={startQRScanner}
+                    className="w-full"
+                    style={{ height: "50px", fontSize: "16px" }}
+                  >
+                    📱 QR কোড স্ক্যান করুন
                   </Button>
                 </div>
-              ) : (
-                <div className="w-full h-[250px] border rounded bg-gray-50 flex items-center justify-center">
-                  <div id={scannerId} className="w-full h-full" />
-                </div>
-              )}
-              <div className="text-center mt-4">
-                <Button onClick={() => setScanning(false)}>
-                  স্ক্যান বাতিল করুন
-                </Button>
-              </div>
-            </div>
-          )}
 
-          {!scanning && step === 1 && (
-            <div className="space-y-6">
-              <div className="text-center">
+                {scanning && (
+                  <div className="mb-4">
+                    {cameraError ? (
+                      <Alert
+                        message="ক্যামেরা অ্যাক্সেস ব্যর্থ হয়েছে"
+                        type="error"
+                      />
+                    ) : (
+                      <div className="w-full h-[250px] border rounded bg-gray-50 flex items-center justify-center">
+                        <div id={scannerId} className="w-full h-full" />
+                      </div>
+                    )}
+                    <div className="text-center mt-2">
+                      <Button onClick={() => setScanning(false)}>
+                        স্ক্যান বাতিল করুন
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {scannedProduct && (
+                  <div className="p-4 border rounded bg-green-50">
+                    <Title level={5}>স্ক্যান করা পণ্য:</Title>
+                    <Descriptions size="small" column={1}>
+                      <Descriptions.Item label="পণ্যের নাম">
+                        {scannedProduct.productName}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="ক্যাটাগরি">
+                        {scannedProduct.category}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="ইউনিট প্রাইস">
+                        ৳{scannedProduct.unitPrice}
+                      </Descriptions.Item>
+                    </Descriptions>
+                    <Button
+                      type="primary"
+                      onClick={addToOrder}
+                      className="w-full mt-2"
+                    >
+                      অর্ডারে যোগ করুন
+                    </Button>
+                  </div>
+                )}
+              </Card>
+
+              {/* Order Summary */}
+              <Card title="অর্ডার সামারি">
+                <Table
+                  columns={columns}
+                  dataSource={orderItems}
+                  pagination={false}
+                  scroll={{ x: 800 }}
+                  size="small"
+                />
+
+                <Divider />
+
+                <div className="text-right">
+                  <Title level={4}>মোট Amount: ৳{totalAmount}</Title>
+                </div>
+
                 <Button
                   type="primary"
                   size="large"
-                  icon={<QrcodeOutlined />}
-                  onClick={startQRScanner}
-                  className="bg-blue-600 hover:bg-blue-700 border-blue-700 mb-4"
-                  style={{ height: "50px", fontSize: "16px" }}
+                  onClick={submitOrder}
+                  loading={loading}
+                  className="w-full"
+                  disabled={orderItems.length === 0}
                 >
-                  📱 QR কোড স্ক্যান করুন
+                  অর্ডার সাবমিট করুন
                 </Button>
-                <div className="text-gray-600 text-sm">
-                  অথবা ম্যানুয়ালি পণ্য আইডি লিখুন
-                </div>
-              </div>
-
-              <Divider>অথবা</Divider>
-
-              <div className="mb-6">
-                <label
-                  htmlFor="productID"
-                  className="block text-sm font-medium text-blue-700 mb-2"
-                >
-                  পণ্য আইডি লিখুন
-                </label>
-                <Input
-                  placeholder="যেমন: 12345 বা productId:12345"
-                  size="large"
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      handleProductIDSubmit({ productID: e.target.value });
-                    }
-                  }}
-                  className="border-blue-300"
-                />
-                <div className="text-gray-500 text-sm mt-1">
-                  পণ্য আইডি, JSON ডাটা, বা productId:12345 ফরম্যাটে লিখুন
-                </div>
-              </div>
-            </div>
-          )}
-
-          {!scanning && step === 2 && productDetails && (
-            <div>
-              {loading ? (
-                <Skeleton active paragraph={{ rows: 4 }} />
-              ) : (
-                <>
-                  <div className="mb-6 p-4 bg-white rounded-lg border border-blue-200">
-                    <Row gutter={16} align="middle" className="mb-4">
-                      <Col>
-                        {productDetails.image && (
-                          <Image
-                            src={productDetails.image}
-                            alt={productDetails.productName}
-                            className="w-20 h-20 rounded-lg object-cover"
-                            preview={false}
-                          />
-                        )}
-                      </Col>
-                      <Col flex={1}>
-                        <Title level={4} className="mb-0 text-blue-800">
-                          {productDetails.productName}
-                        </Title>
-                        <Text className="text-blue-600">
-                          পণ্য আইডি: {productDetails.productId}
-                        </Text>
-                      </Col>
-                      <Col>
-                        <Tag color={getStatusColor(productDetails.status)}>
-                          {getStatusText(productDetails.status)}
-                        </Tag>
-                      </Col>
-                    </Row>
-
-                    <Descriptions
-                      bordered
-                      column={1}
-                      size="small"
-                      className="mb-4"
-                    >
-                      <Descriptions.Item label="পণ্যের নাম">
-                        {productDetails.productName}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="বর্ণনা">
-                        {productDetails.description || "কোন বর্ণনা নেই"}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="ক্যাটাগরি">
-                        {productDetails.category}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="ইউনিট প্রাইস">
-                        <span className="font-semibold text-green-600">
-                          ৳{productDetails.unitPrice}
-                        </span>
-                      </Descriptions.Item>
-                      <Descriptions.Item label="স্টক পরিমাণ">
-                        <span
-                          className={
-                            productDetails.stockQuantity > 0
-                              ? "text-green-600 font-semibold"
-                              : "text-red-600 font-semibold"
-                          }
-                        >
-                          {productDetails.stockQuantity} পিস
-                        </span>
-                      </Descriptions.Item>
-                      <Descriptions.Item label="স্ট্যাটাস">
-                        <Tag color={getStatusColor(productDetails.status)}>
-                          {getStatusText(productDetails.status)}
-                        </Tag>
-                      </Descriptions.Item>
-                    </Descriptions>
-
-                    {productDetails.stockQuantity === 0 && (
-                      <Alert
-                        message="স্টক নেই"
-                        description="এই পণ্যটির বর্তমানে কোন স্টক নেই।"
-                        type="warning"
-                        showIcon
-                        className="mb-4"
-                      />
-                    )}
-
-                    <div className="text-center p-3 bg-blue-50 rounded border border-blue-200">
-                      <Text strong className="text-blue-700">
-                        পণ্য স্ক্যান সফল হয়েছে
-                      </Text>
-                      <p className="text-lg font-bold text-blue-700 my-2">
-                        {productDetails.productName}
-                      </p>
-                      <Text className="text-blue-600">
-                        পণ্যের সকল তথ্য উপরে দেখানো হয়েছে
-                      </Text>
-                    </div>
-                  </div>
-
-                  <div className="text-center">
-                    <Button
-                      type="primary"
-                      size="large"
-                      className="bg-blue-600 hover:bg-blue-700 border-blue-700"
-                      onClick={resetForm}
-                    >
-                      নতুন পণ্য স্ক্যান করুন
-                    </Button>
-                    <Button
-                      onClick={resetForm}
-                      size="large"
-                      className="ml-4 border-blue-500 text-blue-700 hover:border-blue-700"
-                    >
-                      পিছনে
-                    </Button>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
+              </Card>
+            </Col>
+          </Row>
         </Card>
       </div>
     </div>
   );
 };
 
-export default ProductQRScanner;
+export default OrderEntry;
