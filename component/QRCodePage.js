@@ -19,6 +19,7 @@ import {
   Image,
   Dropdown,
   Menu,
+  Typography,
 } from "antd";
 import {
   QrcodeOutlined,
@@ -39,6 +40,7 @@ import jsPDF from "jspdf";
 
 const { Option } = Select;
 const { RangePicker } = DatePicker;
+const { Text } = Typography;
 
 const QRCodePage = () => {
   const [products, setProducts] = useState([]);
@@ -180,16 +182,9 @@ const QRCodePage = () => {
     return category ? category.categoryName : categoryValue;
   };
 
-  // Fixed QR Data Generation - Simple and compatible format
+  // Simple QR Data - Only product ID for scanning
   const generateQRData = (product) => {
-    const qrData = {
-      productId: product.productId,
-      productName: product.productName,
-      category: product.category,
-      price: product.unitPrice,
-      quantity: product.qty,
-    };
-    return JSON.stringify(qrData);
+    return product.productId.toString(); // Only product ID as string
   };
 
   const handleBulkPrint = () => {
@@ -432,6 +427,20 @@ const QRCodePage = () => {
       render: (price) => `৳${(price || 0).toFixed(2)}`,
     },
     {
+      title: "QR কোড",
+      key: "qrcode",
+      width: 100,
+      render: (_, record) => (
+        <div className="text-center">
+          <QRCode
+            value={generateQRData(record)}
+            size={40}
+            style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+          />
+        </div>
+      ),
+    },
+    {
       title: "কর্ম",
       key: "actions",
       width: 120,
@@ -523,24 +532,37 @@ const QRCodePage = () => {
               />
             </div>
             <div className="mt-2 text-center">
-              <p
-                className="font-semibold mb-1"
-                style={{ fontSize: "12px", lineHeight: "1.2" }}
+              <Text
+                strong
+                style={{
+                  fontSize: "12px",
+                  lineHeight: "1.2",
+                  display: "block",
+                  marginBottom: "2px",
+                }}
               >
                 {product.productName}
-              </p>
-              <p
-                className="text-gray-600"
-                style={{ fontSize: "10px", lineHeight: "1.2" }}
+              </Text>
+              <Text
+                style={{
+                  fontSize: "10px",
+                  lineHeight: "1.2",
+                  display: "block",
+                  marginBottom: "2px",
+                }}
               >
                 {getCategoryLabel(product.category)}
-              </p>
-              <p
-                className="text-gray-500 mt-1"
-                style={{ fontSize: "9px", lineHeight: "1.2" }}
+              </Text>
+              <Text
+                type="secondary"
+                style={{
+                  fontSize: "9px",
+                  lineHeight: "1.2",
+                  display: "block",
+                }}
               >
                 ID: {product.productId}
-              </p>
+              </Text>
             </div>
           </div>
         ))}
@@ -708,6 +730,7 @@ const QRCodePage = () => {
                 <th className="p-2 text-left">ক্যাটাগরি</th>
                 <th className="p-2 text-left">পরিমাণ</th>
                 <th className="p-2 text-left">মূল্য</th>
+                <th className="p-2 text-left">QR কোড</th>
                 <th className="p-2 text-left">কর্ম</th>
               </tr>
             </thead>
@@ -777,6 +800,19 @@ const QRCodePage = () => {
                     </td>
                     <td className="p-2">
                       ৳{(product.unitPrice || 0).toFixed(2)}
+                    </td>
+                    <td className="p-2">
+                      <div className="flex justify-center">
+                        <QRCode
+                          value={generateQRData(product)}
+                          size={40}
+                          style={{
+                            height: "auto",
+                            maxWidth: "100%",
+                            width: "100%",
+                          }}
+                        />
+                      </div>
                     </td>
                     <td className="p-2">
                       <Dropdown

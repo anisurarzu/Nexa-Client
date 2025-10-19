@@ -20,8 +20,8 @@ import {
   Row,
   Col,
   InputNumber,
-  Spin,
   Alert,
+  Spin,
 } from "antd";
 import {
   EditOutlined,
@@ -34,8 +34,8 @@ import {
   SyncOutlined,
   ExportOutlined,
   QrcodeOutlined,
+  CheckCircleOutlined,
   CloseCircleOutlined,
-  CameraOutlined,
 } from "@ant-design/icons";
 import { useFormik } from "formik";
 import dayjs from "dayjs";
@@ -50,18 +50,15 @@ dayjs.extend(timezone);
 
 const { Option } = Select;
 
-// ----------------- Helpers -----------------
+// ==================== CONSTANTS ====================
 const INITIAL_PAGINATION = { current: 1, pageSize: 10 };
 const PAYMENT_METHODS = ["Cash on Delivery", "Online Payment", "Bank Transfer"];
 const ORDER_STATUSES = ["Pending", "On Process", "Dispatched", "Delivered"];
 
+// ==================== HELPER FUNCTIONS ====================
 const getUserInfo = () => {
   if (typeof window === "undefined") return {};
-  try {
-    return JSON.parse(localStorage.getItem("userInfo") || "{}");
-  } catch {
-    return {};
-  }
+  return JSON.parse(localStorage.getItem("userInfo") || "{}");
 };
 
 const formatDeliveryDateTime = (dateTime) => {
@@ -80,35 +77,34 @@ const getStatusColor = (status) => {
 };
 
 const parseQRCode = (qrData) => {
-  // তোমার আগের parse logic রিইউজ করা হলো — প্রয়োজনে আরও কাস্টমাইজ করো
   try {
+    // Try to parse as JSON first
     const productData = JSON.parse(qrData);
     return productData.productId || productData.id || productData.product_id;
   } catch (e) {
-    if (typeof qrData === "string") {
-      if (qrData.includes("productId:")) {
-        const v = qrData.split("productId:")[1];
-        return parseInt(v);
-      } else if (qrData.includes("id=")) {
-        return parseInt(qrData.split("id=")[1]);
-      }
-      const intVal = parseInt(qrData);
-      return isNaN(intVal) ? null : intVal;
+    // If JSON parsing fails, try to extract product ID from string
+    if (qrData.includes("productId:")) {
+      return parseInt(qrData.split("productId:")[1]);
+    } else if (qrData.includes("id=")) {
+      return parseInt(qrData.split("id=")[1]);
     }
-    return null;
+    // If it's just a number, parse it directly
+    return parseInt(qrData);
   }
 };
 
-// ----------------- Component -----------------
-const OrderEntryRefined = () => {
+// ==================== MAIN COMPONENT ====================
+const OrderEntry = () => {
+  // User Info
   const userInfo = getUserInfo();
 
-  // --- State ---
+  // State Management
   const [orders, setOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
 
+  // UI State
   const [visible, setVisible] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingKey, setEditingKey] = useState(null);
@@ -116,27 +112,26 @@ const OrderEntryRefined = () => {
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Filter State
   const [searchText, setSearchText] = useState("");
   const [statusFilter, setStatusFilter] = useState(null);
   const [dateFilter, setDateFilter] = useState(null);
   const [pagination, setPagination] = useState(INITIAL_PAGINATION);
 
-  // QR Scanner state
+  // QR Scanner State
   const [isScanModalVisible, setIsScanModalVisible] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [scannedProduct, setScannedProduct] = useState(null);
-  const [availableCameras, setAvailableCameras] = useState([]);
-  const [selectedCameraId, setSelectedCameraId] = useState(null);
-  const [scannerError, setScannerError] = useState(null);
+  const [scanStatus, setScanStatus] = useState("idle"); // 'idle', 'scanning', 'success', 'error'
+  const [scanMessage, setScanMessage] = useState("");
 
-  // refs
+  // Refs
   const videoRef = useRef(null);
-  const canvasRef = useRef(null);
   const streamRef = useRef(null);
+  const canvasRef = useRef(null);
   const scanningRef = useRef(false);
-  const rafRef = useRef(null);
 
-  // ----------------- Data fetchers (kept similar to original) -----------------
+  // ==================== DATA FETCHING ====================
   const fetchProducts = useCallback(async () => {
     try {
       const response = await coreAxios.get("/products");
@@ -168,6 +163,7 @@ const OrderEntryRefined = () => {
     async (isRefresh = false) => {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
+
       try {
         const params = {
           status: statusFilter,
@@ -177,8 +173,8 @@ const OrderEntryRefined = () => {
         };
         const response = await coreAxios.get("orders", { params });
         if (response?.status === 200) {
-          setOrders(response.data || []);
-          setFilteredOrders(response.data || []);
+          setOrders(response.data);
+          setFilteredOrders(response.data);
         }
       } catch (error) {
         console.error("Error fetching orders:", error);
@@ -192,206 +188,127 @@ const OrderEntryRefined = () => {
     [statusFilter, dateFilter]
   );
 
+  // Initial Data Load
   useEffect(() => {
     fetchOrders();
     fetchProducts();
     fetchCategories();
   }, [fetchOrders, fetchProducts, fetchCategories]);
 
-  // ----------------- QR: Utilities -----------------
-  const isSecureContext =
-    typeof window !== "undefined" && window.isSecureContext;
+  // ==================== IMPROVED QR SCANNER LOGIC ====================
+  const startScanner = useCallback(async () => {
+    setScanning(true);
+    setScanStatus("scanning");
+    setScanMessage("ক্যামেরা শুরু হচ্ছে...");
+    scanningRef.current = true;
 
-  const enumerateCameras = useCallback(async () => {
     try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
-        setAvailableCameras([]);
-        return;
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "environment",
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      });
+
+      streamRef.current = stream;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        setScanMessage("QR কোড স্ক্যান করার জন্য ক্যামেরার সামনে ধরুন...");
+        requestAnimationFrame(scanQRCode);
       }
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoInputs = devices.filter((d) => d.kind === "videoinput");
-      setAvailableCameras(videoInputs);
-      // auto choose an 'environment' like camera if possible:
-      if (videoInputs.length > 0) {
-        // try to find camera labeled with back/environment
-        const env = videoInputs.find((d) =>
-          /back|rear|environment|গোপন|পেছনে/i.test(d.label || "")
-        );
-        setSelectedCameraId(
-          (prev) => prev || (env ? env.deviceId : videoInputs[0].deviceId)
-        );
-      } else {
-        setSelectedCameraId(null);
-      }
-    } catch (err) {
-      console.error("enumerateDevices error:", err);
-      setAvailableCameras([]);
+    } catch (error) {
+      console.error("Camera access error:", error);
+      setScanStatus("error");
+      setScanMessage(
+        "ক্যামেরা এক্সেস করতে সমস্যা হয়েছে! ক্যামেরা পারমিশন চেক করুন।"
+      );
+      setScanning(false);
+      scanningRef.current = false;
     }
   }, []);
 
-  // call enumerate when modal opens
-  useEffect(() => {
-    if (isScanModalVisible) enumerateCameras();
-  }, [isScanModalVisible, enumerateCameras]);
-
-  // ----------------- Start / Stop Scanner -----------------
   const stopScanner = useCallback(() => {
     scanningRef.current = false;
     setScanning(false);
-    setScannerError(null);
-
-    if (rafRef.current) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-    }
+    setScanStatus("idle");
+    setScanMessage("");
 
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
     if (videoRef.current) {
-      try {
-        videoRef.current.pause();
-        videoRef.current.srcObject = null;
-      } catch (e) {
-        // ignore
-      }
+      videoRef.current.srcObject = null;
     }
   }, []);
 
-  const startScanner = useCallback(
-    async (deviceId = null) => {
-      setScannerError(null);
+  const scanQRCode = useCallback(() => {
+    if (!scanningRef.current || !videoRef.current || !canvasRef.current) {
+      return;
+    }
 
-      if (typeof window === "undefined") return;
-      if (!isSecureContext) {
-        setScannerError(
-          "ক্যামেরা কাজ করার জন্য HTTPS প্রয়োজন (বা localhost) — ব্রাউজার নিরাপদ নয়।"
-        );
-        message.error("অবশ্যই HTTPS/localhost এ চালান।");
-        return;
-      }
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
 
-      // try permission first
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
       try {
-        // Try to open with selected deviceId if provided
-        const constraints = {
-          video: deviceId
-            ? {
-                deviceId: { exact: deviceId },
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-              }
-            : {
-                facingMode: { ideal: "environment" },
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-              },
-          audio: false,
-        };
+        const imageData = context.getImageData(
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: "dontInvert",
+        });
 
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        streamRef.current = stream;
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
+        if (code?.data) {
+          handleScannedQRCode(code.data);
+          return;
         }
-
-        scanningRef.current = true;
-        setScanning(true);
-        setScannerError(null);
-
-        // start scanning loop
-        const loop = () => {
-          if (!scanningRef.current) return;
-          try {
-            const video = videoRef.current;
-            const canvas = canvasRef.current;
-            if (
-              video &&
-              canvas &&
-              video.readyState === video.HAVE_ENOUGH_DATA
-            ) {
-              canvas.width = video.videoWidth;
-              canvas.height = video.videoHeight;
-              const ctx = canvas.getContext("2d", { willReadFrequently: true });
-              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-              try {
-                const imageData = ctx.getImageData(
-                  0,
-                  0,
-                  canvas.width,
-                  canvas.height
-                );
-                const code = jsQR(
-                  imageData.data,
-                  imageData.width,
-                  imageData.height,
-                  {
-                    inversionAttempts: "attemptBoth",
-                  }
-                );
-
-                if (code && code.data) {
-                  // found!
-                  handleScannedQRCode(code.data);
-                  return; // stop scanning loop (handleScannedQRCode will stop camera)
-                }
-              } catch (err) {
-                // sometimes cross-origin or read errors happen
-                console.warn("canvas read error:", err);
-              }
-            }
-          } catch (err) {
-            console.error("scan loop error:", err);
-          }
-          rafRef.current = requestAnimationFrame(loop);
-        };
-
-        rafRef.current = requestAnimationFrame(loop);
-      } catch (err) {
-        console.error("startScanner error:", err);
-        // permission denied or not found
-        if (err && err.name === "NotAllowedError") {
-          setScannerError(
-            "ক্যামেরা অনুমতি পাওয়া যায়নি — ব্রাউজার সেটিংসে গিয়ে Allow করে আবার চেষ্টা করুন।"
-          );
-          message.error("ক্যামেরা অনুমতি ব্লক আছে।");
-        } else if (err && err.name === "NotFoundError") {
-          setScannerError("কোন ক্যামেরা ডিভাইস পাওয়া যায়নি।");
-        } else {
-          setScannerError("ক্যামেরা চালু করতে সমস্যা হয়েছে। কনসোলে চেক করুন।");
-        }
-        stopScanner();
+      } catch (error) {
+        console.error("QR scanning error:", error);
       }
-    },
-    [isSecureContext, stopScanner]
-  );
+    }
 
-  // ----------------- Handle scanned data -----------------
+    if (scanningRef.current) {
+      requestAnimationFrame(scanQRCode);
+    }
+  }, [products]);
+
   const handleScannedQRCode = useCallback(
     (qrData) => {
-      // stop scanner first
       stopScanner();
-      setIsScanModalVisible(false);
+      setScanStatus("success");
       console.log("Scanned QR Data:", qrData);
 
       const productId = parseQRCode(qrData);
 
-      if (!productId) {
-        message.error("QR কোড থেকে সঠিক Product ID পাওয়া যায়নি!");
+      if (!productId || isNaN(productId)) {
+        setScanStatus("error");
+        setScanMessage(
+          "QR কোড থেকে সঠিক Product ID পাওয়া যায়নি! অনুগ্রহ করে ভিন্ন QR কোড ব্যবহার করুন।"
+        );
+        message.error("QR কোড থেকে সঠিক Product ID পাওয়া যায়নি!");
         return;
       }
 
-      const product = products.find(
-        (p) => p.productId === productId || p.productId === Number(productId)
-      );
+      const product = products.find((p) => p.productId === productId);
+
       if (product) {
         setScannedProduct(product);
+        setScanMessage(`সফলভাবে স্ক্যান হয়েছে: ${product.productName}`);
         message.success(`পণ্য স্ক্যান সফল: ${product.productName}`);
-        // auto open order modal and set form values
+
+        // Auto-fill the form with scanned product data
         formik.setValues({
           ...formik.values,
           productId: product.productId,
@@ -400,22 +317,39 @@ const OrderEntryRefined = () => {
           category: product.category,
           totalBill: product.unitPrice || 0,
         });
-        setVisible(true);
+
+        // Close scan modal after 1.5 seconds and open order form
+        setTimeout(() => {
+          setIsScanModalVisible(false);
+          setVisible(true);
+          setScanStatus("idle");
+          setScanMessage("");
+        }, 1500);
       } else {
-        message.error(`Product ID ${productId} খুঁজে পাওয়া যায়নি!`);
+        setScanStatus("error");
+        setScanMessage(
+          `Product ID ${productId} খুঁজে পাওয়া যায়নি! ডাটাবেসে এই পণ্য নেই।`
+        );
+        message.error(`Product ID ${productId} খুঁজে পাওয়া যায়নি!`);
       }
     },
     [products, stopScanner]
   );
 
-  // cleanup on unmount
+  // Scanner Modal Effect
   useEffect(() => {
-    return () => {
+    if (isScanModalVisible) {
+      startScanner();
+    } else {
       stopScanner();
-    };
-  }, [stopScanner]);
+      setScanStatus("idle");
+      setScanMessage("");
+    }
 
-  // ----------------- Formik (kept similar) -----------------
+    return () => stopScanner();
+  }, [isScanModalVisible, startScanner, stopScanner]);
+
+  // ==================== FORM LOGIC ====================
   const formik = useFormik({
     initialValues: {
       prevInvoiceNo: "",
@@ -451,6 +385,7 @@ const OrderEntryRefined = () => {
     onSubmit: async (values, { resetForm }) => {
       try {
         setLoading(true);
+
         const orderData = {
           ...values,
           deliveryDateTime: values.deliveryDateTime.format(
@@ -459,6 +394,7 @@ const OrderEntryRefined = () => {
           createdBy: userInfo?.loginID || "system",
           updatedBy: userInfo?.loginID || "system",
         };
+
         const response = isEditing
           ? await coreAxios.put(`orders/${editingKey}`, orderData)
           : await coreAxios.post("orders", orderData);
@@ -485,7 +421,7 @@ const OrderEntryRefined = () => {
     },
   });
 
-  // auto calculate totals
+  // Auto Calculate Grand Total
   useEffect(() => {
     const totalBill = parseFloat(formik.values.totalBill) || 0;
     const discount = parseFloat(formik.values.discount) || 0;
@@ -493,12 +429,13 @@ const OrderEntryRefined = () => {
     const addOnPrice = formik.values.addOnRequirement
       ? parseFloat(formik.values.addOnPrice) || 0
       : 0;
+
     const grandTotal = totalBill - discount + deliveryCharge + addOnPrice;
     const amountPaid = parseFloat(formik.values.amountPaid) || 0;
     const totalDue = grandTotal - amountPaid;
-    formik.setFieldValue("grandTotal", grandTotal, false);
-    formik.setFieldValue("totalDue", totalDue, false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    formik.setFieldValue("grandTotal", grandTotal);
+    formik.setFieldValue("totalDue", totalDue);
   }, [
     formik.values.totalBill,
     formik.values.discount,
@@ -508,7 +445,7 @@ const OrderEntryRefined = () => {
     formik.values.amountPaid,
   ]);
 
-  // ----------------- CRUD helpers (edit/delete kept similar) -----------------
+  // ==================== CRUD OPERATIONS ====================
   const handleEdit = useCallback(
     (record) => {
       setEditingKey(record._id);
@@ -520,7 +457,7 @@ const OrderEntryRefined = () => {
       setVisible(true);
       setIsEditing(true);
     },
-    [userInfo, formik]
+    [userInfo]
   );
 
   const handleDelete = useCallback(
@@ -542,6 +479,7 @@ const OrderEntryRefined = () => {
     [fetchOrders]
   );
 
+  // ==================== SEARCH & FILTER ====================
   const handleSearch = useCallback(
     (value) => {
       setSearchText(value);
@@ -556,7 +494,7 @@ const OrderEntryRefined = () => {
     [orders]
   );
 
-  // ----------------- Export (kept similar) -----------------
+  // ==================== EXPORT ====================
   const exportToExcel = useCallback(async () => {
     try {
       setLoading(true);
@@ -620,7 +558,7 @@ const OrderEntryRefined = () => {
     }
   }, []);
 
-  // ----------------- UI helpers -----------------
+  // ==================== HELPER FUNCTIONS ====================
   const getCategoryLabel = useCallback(
     (categoryValue) => {
       const category = categories.find(
@@ -631,6 +569,7 @@ const OrderEntryRefined = () => {
     [categories]
   );
 
+  // ==================== TABLE COLUMNS ====================
   const columns = [
     {
       title: "অর্ডার নং",
@@ -708,236 +647,51 @@ const OrderEntryRefined = () => {
     },
   ];
 
-  // ----------------- QR Scanner Modal UI -----------------
-  const QRScannerModal = () => (
-    <Modal
-      title={
-        <Space>
-          <QrcodeOutlined />
-          <span>QR কোড স্ক্যান করুন</span>
-        </Space>
-      }
-      open={isScanModalVisible}
-      onCancel={() => {
-        stopScanner();
-        setIsScanModalVisible(false);
-      }}
-      width={720}
-      footer={[
-        <Button
-          key="close"
-          onClick={() => {
-            stopScanner();
-            setIsScanModalVisible(false);
-          }}
-        >
-          বাতিল
-        </Button>,
-      ]}
-      destroyOnClose
-    >
-      <div style={{ display: "flex", gap: 16 }}>
-        <div style={{ flex: 1, textAlign: "center" }}>
-          {/* camera area */}
-          <div
-            style={{
-              position: "relative",
-              display: "inline-block",
-              width: "100%",
-              maxWidth: 560,
-            }}
-          >
-            <div
-              style={{
-                borderRadius: 8,
-                overflow: "hidden",
-                border: "2px solid #e6f7ff",
-                boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
-              }}
-            >
-              <video
-                ref={videoRef}
-                style={{
-                  width: "100%",
-                  height: "auto",
-                  display: scanning ? "block" : "none",
-                  background: "#000",
-                }}
-                playsInline
-                muted
-              />
-              {!scanning && (
-                <div
-                  style={{
-                    padding: 40,
-                    minHeight: 220,
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "center",
-                    alignItems: "center",
-                  }}
-                >
-                  <CameraOutlined style={{ fontSize: 48, color: "#bfbfbf" }} />
-                  <div style={{ marginTop: 12, color: "#8c8c8c" }}>
-                    {scannerError ? scannerError : "ক্যামেরা লোড হচ্ছে..."}
-                  </div>
-                </div>
-              )}
-              {/* green dashed box overlay */}
-              <div
-                style={{
-                  position: "absolute",
-                  top: "50%",
-                  left: "50%",
-                  transform: "translate(-50%, -50%)",
-                  width: "60%",
-                  height: "60%",
-                  border: "2px dashed #52c41a",
-                  borderRadius: 8,
-                  pointerEvents: "none",
-                }}
-              />
-            </div>
-            <canvas ref={canvasRef} style={{ display: "none" }} />
-          </div>
-        </div>
-
-        <div style={{ width: 260 }}>
-          <Space direction="vertical" style={{ width: "100%" }}>
-            <div>
-              <strong>ক্যামেরা নির্বাচন</strong>
-              <div style={{ marginTop: 8 }}>
-                <Select
-                  style={{ width: "100%" }}
-                  placeholder={
-                    availableCameras.length
-                      ? "ক্যামেরা সিলেক্ট করুন"
-                      : "কোন ক্যামেরা পাওয়া যায়নি"
-                  }
-                  value={selectedCameraId}
-                  onChange={(val) => {
-                    setSelectedCameraId(val);
-                  }}
-                  allowClear
-                >
-                  {availableCameras.map((cam) => (
-                    <Option key={cam.deviceId} value={cam.deviceId}>
-                      {cam.label || `Camera ${cam.deviceId}`}
-                    </Option>
-                  ))}
-                </Select>
-              </div>
-            </div>
-
-            <div>
-              <strong>নির্দেশ</strong>
-              <ul style={{ paddingLeft: 18, marginTop: 8 }}>
-                <li>QR কোড সবুজ বক্সের মধ্যে রাখুন</li>
-                <li>আলো ভালো রাখলে স্ক্যান দ্রুত হবে</li>
-                <li>মোবাইলে পেছনের ক্যামেরা বেশি ভাল কাজ করে</li>
-              </ul>
-            </div>
-
-            <div>
-              <Space direction="vertical" style={{ width: "100%" }}>
-                <Button
-                  type="primary"
-                  icon={<QrcodeOutlined />}
-                  onClick={() => {
-                    // start scanner with selected device or fallback
-                    setScannerError(null);
-                    startScanner(selectedCameraId || null);
-                  }}
-                  block
-                  disabled={scanning}
-                >
-                  স্ক্যান শুরু করুন
-                </Button>
-
-                <Button
-                  onClick={() => {
-                    stopScanner();
-                  }}
-                  block
-                  danger
-                >
-                  স্টপ করুন
-                </Button>
-
-                <Button
-                  onClick={() => {
-                    // refresh camera list
-                    enumerateCameras();
-                    message.info("ক্যামেরা তালিকা আপডেট করা হচ্ছে...");
-                  }}
-                  block
-                >
-                  ক্যামেরা রিফ্রেশ
-                </Button>
-
-                {/* show status */}
-                <div style={{ marginTop: 8 }}>
-                  {scanning ? (
-                    <Tag color="green">Scanning...</Tag>
-                  ) : (
-                    <Tag color="default">Idle</Tag>
-                  )}
-                  {scannerError && (
-                    <div style={{ marginTop: 8 }}>
-                      <Alert message={scannerError} type="error" />
-                    </div>
-                  )}
-                </div>
-              </Space>
-            </div>
-          </Space>
-        </div>
-      </div>
-    </Modal>
-  );
-
-  // ----------------- Order Form component (same as original but a bit trimmed) -----------------
+  // ==================== ORDER FORM COMPONENT ====================
   const OrderForm = () => (
     <Form layout="vertical" onFinish={formik.handleSubmit}>
-      <Form.Item label="QR স্ক্যান করুন">
+      {/* QR Scanner Button */}
+      <Form.Item label="QR কোড স্ক্যান করুন">
         <Button
           type="dashed"
           icon={<QrcodeOutlined />}
-          onClick={() => {
-            setScannerError(null);
-            setIsScanModalVisible(true);
-          }}
+          onClick={() => setIsScanModalVisible(true)}
           block
           size="large"
+          style={{ height: "50px", fontSize: "16px" }}
         >
-          পণ্য স্ক্যান করুন
+          📱 পণ্য স্ক্যান করুন
         </Button>
+        <div style={{ marginTop: "8px", fontSize: "12px", color: "#666" }}>
+          QR কোড স্ক্যান করে পণ্যের তথ্য অটো ফিল করুন
+        </div>
       </Form.Item>
 
+      {/* Scanned Product Info */}
       {scannedProduct && (
-        <Card
-          size="small"
-          style={{
-            marginBottom: 16,
-            borderColor: "#52c41a",
-            backgroundColor: "#f6ffed",
-          }}
-        >
-          <Row gutter={16}>
-            <Col span={8}>
-              <strong>পণ্য:</strong> {scannedProduct.productName}
-            </Col>
-            <Col span={8}>
-              <strong>ক্যাটাগরি:</strong>{" "}
-              {getCategoryLabel(scannedProduct.category)}
-            </Col>
-            <Col span={8}>
-              <strong>মূল্য:</strong> ৳{scannedProduct.unitPrice}
-            </Col>
-          </Row>
-        </Card>
+        <Alert
+          message="পণ্য সফলভাবে স্ক্যান হয়েছে!"
+          description={
+            <Row gutter={16} style={{ marginTop: "8px" }}>
+              <Col span={8}>
+                <strong>পণ্য:</strong> {scannedProduct.productName}
+              </Col>
+              <Col span={8}>
+                <strong>ক্যাটাগরি:</strong>{" "}
+                {getCategoryLabel(scannedProduct.category)}
+              </Col>
+              <Col span={8}>
+                <strong>মূল্য:</strong> ৳{scannedProduct.unitPrice}
+              </Col>
+            </Row>
+          }
+          type="success"
+          showIcon
+          style={{ marginBottom: "16px" }}
+        />
       )}
 
+      {/* Customer Information */}
       <Row gutter={16}>
         <Col span={12}>
           <Form.Item label="গ্রাহকের নাম" required>
@@ -961,7 +715,41 @@ const OrderEntryRefined = () => {
         </Col>
       </Row>
 
-      {/* product select */}
+      {/* Receiver Information */}
+      <Row gutter={16}>
+        <Col span={12}>
+          <Form.Item label="প্রাপকের নাম">
+            <Input
+              name="receiverName"
+              value={formik.values.receiverName}
+              onChange={formik.handleChange}
+              placeholder="প্রাপকের নাম"
+            />
+          </Form.Item>
+        </Col>
+        <Col span={12}>
+          <Form.Item label="প্রাপকের ফোন">
+            <Input
+              name="receiverPhoneNumber"
+              value={formik.values.receiverPhoneNumber}
+              onChange={formik.handleChange}
+              placeholder="প্রাপকের ফোন"
+            />
+          </Form.Item>
+        </Col>
+      </Row>
+
+      <Form.Item label="ঠিকানা">
+        <Input.TextArea
+          name="receiverAddress"
+          value={formik.values.receiverAddress}
+          onChange={formik.handleChange}
+          placeholder="সম্পূর্ণ ঠিকানা"
+          rows={2}
+        />
+      </Form.Item>
+
+      {/* Product Selection */}
       <Row gutter={16}>
         <Col span={16}>
           <Form.Item label="পণ্য নির্বাচন করুন" required>
@@ -981,9 +769,10 @@ const OrderEntryRefined = () => {
                   setScannedProduct(product);
                 }
               }}
-              placeholder="পণ্য নির্বাচন করুন"
+              placeholder="পণ্য নির্বাচন করুন বা QR স্ক্যান করুন"
               showSearch
               optionFilterProp="children"
+              disabled={!!scannedProduct}
             >
               {products.map((product) => (
                 <Option key={product.productId} value={product.productId}>
@@ -1000,7 +789,16 @@ const OrderEntryRefined = () => {
         </Col>
       </Row>
 
-      {/* billing rows */}
+      <Form.Item label="পণ্যের বিবরণ">
+        <Input.TextArea
+          name="productDescription"
+          value={formik.values.productDescription}
+          onChange={formik.handleChange}
+          rows={2}
+        />
+      </Form.Item>
+
+      {/* Billing Information */}
       <Row gutter={16}>
         <Col span={8}>
           <Form.Item label="মোট বিল">
@@ -1044,6 +842,7 @@ const OrderEntryRefined = () => {
         </Col>
       </Row>
 
+      {/* Payment Information */}
       <Row gutter={16}>
         <Col span={8}>
           <Form.Item label="গ্র্যান্ড টোটাল">
@@ -1081,6 +880,7 @@ const OrderEntryRefined = () => {
         </Col>
       </Row>
 
+      {/* Delivery & Payment Method */}
       <Row gutter={16}>
         <Col span={12}>
           <Form.Item label="ডেলিভারি তারিখ ও সময়">
@@ -1111,6 +911,7 @@ const OrderEntryRefined = () => {
         </Col>
       </Row>
 
+      {/* Form Actions */}
       <Form.Item>
         <Space>
           <Button
@@ -1130,7 +931,156 @@ const OrderEntryRefined = () => {
     </Form>
   );
 
-  // ----------------- Final render -----------------
+  // ==================== IMPROVED QR SCANNER MODAL ====================
+  const QRScannerModal = () => (
+    <Modal
+      title={
+        <Space>
+          <QrcodeOutlined />
+          <span>QR কোড স্ক্যান করুন</span>
+        </Space>
+      }
+      open={isScanModalVisible}
+      onCancel={() => {
+        stopScanner();
+        setIsScanModalVisible(false);
+        setScanStatus("idle");
+        setScanMessage("");
+      }}
+      width={600}
+      footer={[
+        <Button
+          key="close"
+          onClick={() => {
+            stopScanner();
+            setIsScanModalVisible(false);
+            setScanStatus("idle");
+            setScanMessage("");
+          }}
+        >
+          বাতিল
+        </Button>,
+      ]}
+      destroyOnClose
+    >
+      <div style={{ textAlign: "center", padding: "20px 0" }}>
+        {/* Scan Status Messages */}
+        {scanStatus === "success" && (
+          <Alert
+            message="স্ক্যান সফল!"
+            description={scanMessage}
+            type="success"
+            showIcon
+            icon={<CheckCircleOutlined />}
+            style={{ marginBottom: 20 }}
+          />
+        )}
+
+        {scanStatus === "error" && (
+          <Alert
+            message="স্ক্যান ব্যর্থ"
+            description={scanMessage}
+            type="error"
+            showIcon
+            icon={<CloseCircleOutlined />}
+            style={{ marginBottom: 20 }}
+          />
+        )}
+
+        {scanStatus === "scanning" && (
+          <Alert
+            message="স্ক্যান চলছে..."
+            description={scanMessage}
+            type="info"
+            showIcon
+            style={{ marginBottom: 20 }}
+          />
+        )}
+
+        {/* Scanner UI */}
+        {!scanning ? (
+          <div style={{ padding: "40px 0" }}>
+            <Spin size="large" />
+            <p style={{ marginTop: 16, color: "#8c8c8c" }}>
+              ক্যামেরা লোড হচ্ছে...
+            </p>
+          </div>
+        ) : (
+          <div>
+            <div
+              style={{
+                position: "relative",
+                display: "inline-block",
+                maxWidth: "100%",
+              }}
+            >
+              <video
+                ref={videoRef}
+                style={{
+                  width: "100%",
+                  maxWidth: "500px",
+                  height: "auto",
+                  border:
+                    scanStatus === "scanning"
+                      ? "3px solid #1890ff"
+                      : scanStatus === "success"
+                      ? "3px solid #52c41a"
+                      : scanStatus === "error"
+                      ? "3px solid #ff4d4f"
+                      : "3px solid #d9d9d9",
+                  borderRadius: "8px",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+                }}
+                playsInline
+                muted
+              />
+              {scanStatus === "scanning" && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "50%",
+                    left: "50%",
+                    transform: "translate(-50%, -50%)",
+                    width: "60%",
+                    height: "60%",
+                    border: "2px dashed #52c41a",
+                    borderRadius: "8px",
+                    pointerEvents: "none",
+                    animation: "pulse 2s ease-in-out infinite",
+                  }}
+                />
+              )}
+            </div>
+            <canvas ref={canvasRef} style={{ display: "none" }} />
+
+            {scanStatus === "scanning" && (
+              <p style={{ marginTop: 16, color: "#52c41a", fontWeight: 500 }}>
+                📱 QR কোড ক্যামেরার সামনে ধরুন...
+              </p>
+            )}
+            <p style={{ fontSize: 12, color: "#8c8c8c", marginTop: 8 }}>
+              QR কোড সবুজ বক্সের মধ্যে রাখুন
+            </p>
+          </div>
+        )}
+      </div>
+      <style jsx>{`
+        @keyframes pulse {
+          0%,
+          100% {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+          }
+          50% {
+            opacity: 0.6;
+            transform: translate(-50%, -50%) scale(1.05);
+          }
+        }
+      `}</style>
+    </Modal>
+  );
+
+  // ==================== RENDER ====================
   if (!userInfo?.pagePermissions?.[1]?.viewAccess) {
     return (
       <div className="flex justify-center items-center h-[80vh]">
@@ -1153,8 +1103,12 @@ const OrderEntryRefined = () => {
   }
 
   return (
-    <div style={{ padding: 24 }}>
+    <div style={{ padding: "24px" }}>
       <style>{`
+        .green-row {
+          background-color: #f6ffed !important;
+          border-left: 3px solid #52c41a;
+        }
         .ant-table-thead > tr > th {
           background-color: #fafafa !important;
           font-weight: 600 !important;
@@ -1164,15 +1118,17 @@ const OrderEntryRefined = () => {
         }
       `}</style>
 
+      {/* Header Card with Filters */}
       <Card style={{ marginBottom: 20 }} bodyStyle={{ padding: "16px 24px" }}>
         <div
           style={{
             display: "flex",
             flexWrap: "wrap",
-            gap: 12,
+            gap: "12px",
             alignItems: "center",
           }}
         >
+          {/* Search */}
           <Input.Search
             placeholder="অর্ডার নং বা নাম দিয়ে খুঁজুন..."
             value={searchText}
@@ -1182,6 +1138,7 @@ const OrderEntryRefined = () => {
             prefix={<SearchOutlined />}
           />
 
+          {/* Status Filter */}
           <Select
             style={{ width: 180 }}
             placeholder="স্ট্যাটাস ফিল্টার"
@@ -1197,6 +1154,7 @@ const OrderEntryRefined = () => {
             ))}
           </Select>
 
+          {/* Date Filter */}
           <DatePicker
             style={{ width: 200 }}
             value={dateFilter}
@@ -1207,7 +1165,8 @@ const OrderEntryRefined = () => {
             allowClear
           />
 
-          <div style={{ marginLeft: "auto", display: "flex", gap: 12 }}>
+          <div style={{ marginLeft: "auto", display: "flex", gap: "12px" }}>
+            {/* Refresh Button */}
             <Tooltip title="রিফ্রেশ করুন">
               <Button
                 icon={<SyncOutlined spin={refreshing} />}
@@ -1218,6 +1177,7 @@ const OrderEntryRefined = () => {
               </Button>
             </Tooltip>
 
+            {/* Export Button */}
             {userInfo?.pagePermissions?.[1]?.insertAccess && (
               <Tooltip title="গত মাসের ডেটা এক্সপোর্ট করুন">
                 <Button
@@ -1230,6 +1190,7 @@ const OrderEntryRefined = () => {
               </Tooltip>
             )}
 
+            {/* Add Order Button */}
             {userInfo?.pagePermissions?.[1]?.insertAccess && (
               <Button
                 type="primary"
@@ -1248,6 +1209,7 @@ const OrderEntryRefined = () => {
         </div>
       </Card>
 
+      {/* Orders Table */}
       <Card>
         <Table
           columns={columns}
@@ -1259,17 +1221,20 @@ const OrderEntryRefined = () => {
           pagination={false}
           loading={initialLoading}
           scroll={{ x: 1200 }}
-          locale={{ emptyText: "কোন অর্ডার পাওয়া যায়নি" }}
+          locale={{
+            emptyText: "কোন অর্ডার পাওয়া যায়নি",
+          }}
         />
 
+        {/* Pagination */}
         <div style={{ marginTop: 16, textAlign: "right" }}>
           <Pagination
             current={pagination.current}
             pageSize={pagination.pageSize}
             total={filteredOrders.length}
-            onChange={(page, pageSize) =>
-              setPagination({ current: page, pageSize })
-            }
+            onChange={(page, pageSize) => {
+              setPagination({ current: page, pageSize });
+            }}
             showSizeChanger
             showQuickJumper
             showTotal={(total, range) =>
@@ -1280,6 +1245,7 @@ const OrderEntryRefined = () => {
         </div>
       </Card>
 
+      {/* Order Form Modal */}
       <Modal
         width={900}
         title={
@@ -1302,9 +1268,10 @@ const OrderEntryRefined = () => {
         <OrderForm />
       </Modal>
 
+      {/* QR Scanner Modal */}
       <QRScannerModal />
     </div>
   );
 };
 
-export default OrderEntryRefined;
+export default OrderEntry;
