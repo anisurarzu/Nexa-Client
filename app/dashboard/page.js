@@ -52,6 +52,7 @@ import CategoryPage from "@/component/CategoryPage";
 import coreAxios from "@/utils/axiosInstance";
 import ExpenseInfo from "@/component/ExpenseInfo";
 import OrderEntry from "@/component/OrderEntry";
+import QRCodePage from "@/component/QRCodePage";
 
 const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
@@ -86,6 +87,11 @@ const rolePermissions = {
     {
       key: "2",
       label: "ব্যবহারকারী",
+      icon: <UsergroupAddOutlined />,
+    },
+    {
+      key: "11",
+      label: "QR কোড জেনারেটর",
       icon: <UsergroupAddOutlined />,
     },
   ],
@@ -912,6 +918,8 @@ const Dashboard = () => {
         return <AgentInformation />;
       case "10":
         return <CategoryPage />;
+      case "11":
+        return <QRCodePage />;
       default:
         return <div>অনুমতি নেই</div>;
     }

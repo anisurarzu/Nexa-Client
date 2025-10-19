@@ -178,7 +178,7 @@ const CategoryPage = () => {
   const handleDelete = async (key) => {
     setLoading(true);
     try {
-      const res = await coreAxios.delete(`/api/categories/${key}`, {
+      const res = await coreAxios.delete(`/categories/${key}`, {
         data: {
           deletedBy: userInfo?.loginID,
           deleteReason: "User initiated deletion",
