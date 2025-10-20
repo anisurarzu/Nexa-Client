@@ -29,6 +29,7 @@ import {
   List,
   Avatar,
   Badge,
+  DatePicker,
 } from "antd";
 import {
   EditOutlined,
@@ -46,6 +47,7 @@ import {
   FilterOutlined,
   MenuOutlined,
   CloseOutlined,
+  CalendarOutlined,
 } from "@ant-design/icons";
 import { useFormik } from "formik";
 import dayjs from "dayjs";
@@ -55,6 +57,30 @@ const { Option } = Select;
 const { TextArea } = Input;
 const { Dragger } = Upload;
 const { useBreakpoint } = Grid;
+
+// Function to convert English numbers to Bengali
+const toBengaliNumber = (number) => {
+  if (number === null || number === undefined) return "";
+
+  const englishNumbers = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
+  const bengaliNumbers = ["০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"];
+
+  return number.toString().replace(/\d/g, (digit) => {
+    return bengaliNumbers[englishNumbers.indexOf(digit)];
+  });
+};
+
+// Function to format price in Bengali
+const formatPriceInBengali = (price) => {
+  if (!price && price !== 0) return "০.০০";
+
+  const formattedPrice = new Intl.NumberFormat("bn-BD", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(price || 0);
+
+  return toBengaliNumber(formattedPrice);
+};
 
 const InventoryPage = () => {
   const [visible, setVisible] = useState(false);
@@ -154,6 +180,7 @@ const InventoryPage = () => {
       unitPrice: 0,
       stockQTY: 0,
       purchaseBy: "",
+      purchaseDate: null, // New field for buying date
       createdBy: userInfo?.loginID,
       createdDate: dayjs().format("YYYY-MM-DD HH:mm:ss"),
       imageUrl: "",
@@ -164,6 +191,9 @@ const InventoryPage = () => {
         const newInventoryItem = {
           ...values,
           stockQTY: values?.stockQTY || values?.qty || 0,
+          purchaseDate: values.purchaseDate
+            ? dayjs(values.purchaseDate).format("YYYY-MM-DD")
+            : null, // Format purchase date
           createdDate: dayjs().format("YYYY-MM-DD HH:mm:ss"),
         };
 
@@ -227,6 +257,7 @@ const InventoryPage = () => {
       unitPrice: record.unitPrice,
       stockQTY: record.stockQTY,
       purchaseBy: record.purchaseBy,
+      purchaseDate: record.purchaseDate ? dayjs(record.purchaseDate) : null, // Set purchase date
       createdBy: userInfo?.loginID,
       createdDate: record.createdDate || dayjs().format("YYYY-MM-DD HH:mm:ss"),
     });
@@ -299,6 +330,16 @@ const InventoryPage = () => {
     }).format(price || 0);
   };
 
+  // Format date in Bengali
+  const formatDateInBengali = (dateString) => {
+    if (!dateString) return "-";
+    const date = dayjs(dateString);
+    const day = toBengaliNumber(date.date());
+    const month = toBengaliNumber(date.month() + 1);
+    const year = toBengaliNumber(date.year());
+    return `${day}/${month}/${year}`;
+  };
+
   // Mobile Card View for Products
   const renderMobileCard = (item) => {
     const stockStatus = getStockStatus(item.qty);
@@ -348,16 +389,28 @@ const InventoryPage = () => {
 
               <div className="flex items-center gap-1">
                 <span className="font-medium">পরিমাণ:</span>
-                <span>{item.qty} পিস</span>
+                <span className="font-mono">
+                  {toBengaliNumber(item.qty)} পিস
+                </span>
               </div>
 
               <div className="flex items-center gap-1">
                 <DollarOutlined className="text-green-500 text-xs" />
                 <span className="font-medium">মূল্য:</span>
-                <span className="text-green-600 font-semibold">
-                  ৳{formatPrice(item.unitPrice)}
+                <span className="text-green-600 font-semibold font-mono">
+                  ৳{formatPriceInBengali(item.unitPrice)}
                 </span>
               </div>
+
+              {item.purchaseDate && (
+                <div className="flex items-center gap-1">
+                  <CalendarOutlined className="text-blue-500 text-xs" />
+                  <span className="font-medium">ক্রয়ের তারিখ:</span>
+                  <span className="font-mono">
+                    {formatDateInBengali(item.purchaseDate)}
+                  </span>
+                </div>
+              )}
 
               {item.purchaseBy && (
                 <div className="flex items-center gap-1">
@@ -461,7 +514,9 @@ const InventoryPage = () => {
       sorter: (a, b) => a.qty - b.qty,
       render: (quantity) => (
         <Space>
-          <span className="font-medium">{quantity}</span>
+          <span className="font-medium font-mono">
+            {toBengaliNumber(quantity)}
+          </span>
           <Tag color={getStockStatus(quantity).color}>
             {getStockStatus(quantity).label}
           </Tag>
@@ -477,11 +532,24 @@ const InventoryPage = () => {
       render: (price) => (
         <Space>
           <DollarOutlined className="text-green-500" />
-          <span className="font-medium text-green-600">
-            ৳{formatPrice(price)}
+          <span className="font-medium text-green-600 font-mono">
+            ৳{formatPriceInBengali(price)}
           </span>
         </Space>
       ),
+    },
+    {
+      title: "ক্রয়ের তারিখ",
+      dataIndex: "purchaseDate",
+      key: "purchaseDate",
+      responsive: ["lg"],
+      render: (date) => (
+        <Space>
+          <CalendarOutlined className="text-blue-500" />
+          <span className="font-mono">{formatDateInBengali(date)}</span>
+        </Space>
+      ),
+      sorter: (a, b) => new Date(a.purchaseDate) - new Date(b.purchaseDate),
     },
     {
       title: "ক্রয় করেছেন",
@@ -494,7 +562,11 @@ const InventoryPage = () => {
       dataIndex: "createdDate",
       key: "createdDate",
       responsive: ["lg"],
-      render: (text) => (text ? dayjs(text).format("DD/MM/YYYY HH:mm") : "-"),
+      render: (text) => (
+        <span className="font-mono">
+          {text ? formatDateInBengali(text) : "-"}
+        </span>
+      ),
       sorter: (a, b) => new Date(a.createdDate) - new Date(b.createdDate),
     },
     ...(userInfo?.pagePermissions?.[4]?.editAccess === true
@@ -541,6 +613,13 @@ const InventoryPage = () => {
         ]
       : []),
   ];
+
+  // Update statistics to show Bengali numbers
+  const bengaliStats = {
+    totalProducts: toBengaliNumber(stats.totalProducts),
+    lowStock: toBengaliNumber(stats.lowStock),
+    outOfStock: toBengaliNumber(stats.outOfStock),
+  };
 
   if (userInfo?.pagePermissions?.[4]?.viewAccess !== true) {
     return (
@@ -648,13 +727,14 @@ const InventoryPage = () => {
             <Card className="text-center shadow-sm border-0 hover:shadow-md transition-shadow h-full">
               <Statistic
                 title={<span className="text-xs lg:text-sm">মোট পণ্য</span>}
-                value={stats.totalProducts}
+                value={bengaliStats.totalProducts}
                 prefix={
                   <ShoppingOutlined className="text-blue-500 text-sm lg:text-base" />
                 }
                 valueStyle={{
                   color: "#1890ff",
                   fontSize: screens.xs ? "16px" : "20px",
+                  fontFamily: "'Noto Sans Bengali', 'Arial', sans-serif",
                 }}
               />
             </Card>
@@ -663,13 +743,14 @@ const InventoryPage = () => {
             <Card className="text-center shadow-sm border-0 hover:shadow-md transition-shadow h-full">
               <Statistic
                 title={<span className="text-xs lg:text-sm">কম স্টক</span>}
-                value={stats.lowStock}
+                value={bengaliStats.lowStock}
                 prefix={
                   <ExclamationCircleOutlined className="text-orange-500 text-sm lg:text-base" />
                 }
                 valueStyle={{
                   color: "#fa8c16",
                   fontSize: screens.xs ? "16px" : "20px",
+                  fontFamily: "'Noto Sans Bengali', 'Arial', sans-serif",
                 }}
               />
             </Card>
@@ -678,13 +759,14 @@ const InventoryPage = () => {
             <Card className="text-center shadow-sm border-0 hover:shadow-md transition-shadow h-full">
               <Statistic
                 title={<span className="text-xs lg:text-sm">স্টক নেই</span>}
-                value={stats.outOfStock}
+                value={bengaliStats.outOfStock}
                 prefix={
                   <InboxOutlined className="text-red-500 text-sm lg:text-base" />
                 }
                 valueStyle={{
                   color: "#f5222d",
                   fontSize: screens.xs ? "16px" : "20px",
+                  fontFamily: "'Noto Sans Bengali', 'Arial', sans-serif",
                 }}
               />
             </Card>
@@ -822,6 +904,13 @@ const InventoryPage = () => {
                   showSizeChanger={false}
                   simple
                   size="small"
+                  showTotal={(total, range) =>
+                    `মোট ${toBengaliNumber(
+                      total
+                    )}টি পণ্যের মধ্যে ${toBengaliNumber(
+                      range[0]
+                    )}-${toBengaliNumber(range[1])}টি দেখানো হচ্ছে`
+                  }
                 />
               </div>
             </div>
@@ -840,7 +929,11 @@ const InventoryPage = () => {
                 showQuickJumper: true,
                 pageSizeOptions: ["10", "20", "50", "100"],
                 showTotal: (total, range) =>
-                  `মোট ${total}টি পণ্যের মধ্যে ${range[0]}-${range[1]}টি দেখানো হচ্ছে`,
+                  `মোট ${toBengaliNumber(
+                    total
+                  )}টি পণ্যের মধ্যে ${toBengaliNumber(
+                    range[0]
+                  )}-${toBengaliNumber(range[1])}টি দেখানো হচ্ছে`,
                 onChange: handleTableChange,
               }}
               scroll={{ x: 800 }}
@@ -1045,7 +1138,7 @@ const InventoryPage = () => {
           </Form.Item>
 
           <Row gutter={16}>
-            <Col xs={24} lg={12}>
+            <Col xs={24} lg={8}>
               <Form.Item
                 label="পরিমাণ"
                 required
@@ -1064,7 +1157,7 @@ const InventoryPage = () => {
                 />
               </Form.Item>
             </Col>
-            <Col xs={24} lg={12}>
+            <Col xs={24} lg={8}>
               <Form.Item
                 label="ইউনিট মূল্য"
                 required
@@ -1083,6 +1176,26 @@ const InventoryPage = () => {
                   className="w-full"
                   size="large"
                   addonBefore={<DollarOutlined />}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} lg={8}>
+              <Form.Item
+                label="ক্রয়ের তারিখ"
+                validateStatus={formik.errors.purchaseDate ? "error" : ""}
+                help={formik.errors.purchaseDate}
+              >
+                <DatePicker
+                  name="purchaseDate"
+                  value={formik.values.purchaseDate}
+                  onChange={(date) =>
+                    formik.setFieldValue("purchaseDate", date)
+                  }
+                  onBlur={formik.handleBlur}
+                  placeholder="তারিখ নির্বাচন করুন"
+                  className="w-full"
+                  size="large"
+                  format="DD/MM/YYYY"
                 />
               </Form.Item>
             </Col>

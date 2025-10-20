@@ -19,6 +19,7 @@ import {
   Tooltip,
   Statistic,
   Spin,
+  Divider,
 } from "antd";
 import {
   QrcodeOutlined,
@@ -35,6 +36,12 @@ import {
   EditOutlined,
   BarChartOutlined,
   ReloadOutlined,
+  RiseOutlined,
+  FallOutlined,
+  ShoppingOutlined,
+  DollarOutlined,
+  ArrowUpOutlined,
+  ArrowDownOutlined,
 } from "@ant-design/icons";
 import { Html5Qrcode } from "html5-qrcode";
 import coreAxios from "@/utils/axiosInstance";
@@ -42,6 +49,24 @@ import dayjs from "dayjs";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
+
+// Dynamically import Google Fonts
+const loadFonts = () => {
+  if (typeof document !== "undefined") {
+    const link1 = document.createElement("link");
+    link1.href =
+      "https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&display=swap";
+    link1.rel = "stylesheet";
+
+    const link2 = document.createElement("link");
+    link2.href =
+      "https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap";
+    link2.rel = "stylesheet";
+
+    document.head.appendChild(link1);
+    document.head.appendChild(link2);
+  }
+};
 
 const OrderEntry = () => {
   const [loading, setLoading] = useState(false);
@@ -76,6 +101,7 @@ const OrderEntry = () => {
 
   // Fetch initial data
   useEffect(() => {
+    loadFonts();
     fetchInitialData();
   }, []);
 
@@ -120,7 +146,7 @@ const OrderEntry = () => {
   // Fetch all orders
   const fetchOrders = async () => {
     try {
-      const response = await coreAxios.get("/orders");
+      const response = await coreAxios.get("/productOrders");
       if (response.data.success) {
         setOrders(response.data.data || []);
       }
@@ -133,7 +159,7 @@ const OrderEntry = () => {
   // Fetch financial summary
   const fetchFinancialSummary = async () => {
     try {
-      const response = await coreAxios.get("/getFinancialSummary");
+      const response = await coreAxios.get("/productOrders/summary/financial");
       if (response.data.success) {
         setFinancialSummary(response.data.data);
       }
@@ -213,12 +239,6 @@ const OrderEntry = () => {
   const fetchProductDetails = async (productId) => {
     setLoading(true);
     try {
-      // const parsedProductId = parseQRCode(productId);
-      // if (!parsedProductId) {
-      //   message.error("অবৈধ QR কোড");
-      //   return;
-      // }
-
       const response = await coreAxios.get(`/products/${productId}`);
       if (response.data.success) {
         const productData = response.data.product;
@@ -230,6 +250,7 @@ const OrderEntry = () => {
           unitPrice: productData.unitPrice,
           salePrice: productData.unitPrice,
           quantity: 1,
+          availableQuantity: productData.quantity || 100, // Default to 100 if not available
         });
 
         message.success("পণ্য সফলভাবে স্ক্যান করা হয়েছে!");
@@ -250,10 +271,19 @@ const OrderEntry = () => {
     setCameraError(false);
   };
 
-  const handleAddOrder = (values) => {
+  const handleAddOrder = async (values) => {
+    console.log("Add Order Values:", values);
+
+    // Validate required fields
+    if (!values.productName || !values.productId) {
+      message.error("পণ্যের নাম এবং আইডি প্রয়োজন!");
+      return;
+    }
+
     const total = values.salePrice * values.quantity;
-    const newItem = {
-      key: Date.now(),
+
+    // Create order immediately when adding product
+    const orderData = {
       productId: values.productId,
       productName: values.productName,
       category: values.category,
@@ -261,82 +291,21 @@ const OrderEntry = () => {
       salePrice: values.salePrice,
       quantity: values.quantity,
       total: total,
+      customerName: values.customerName || "Walk-in Customer",
+      customerPhone: values.customerPhone || "N/A",
+      customerAddress: values.customerAddress || "N/A",
+      totalAmount: total,
+      grandTotal: total,
+      paymentMethod: "Cash",
+      createdBy: "user",
+      status: "Pending", // Default status
     };
 
-    setOrderItems([...orderItems, newItem]);
-    addOrderForm.resetFields();
-    setAddOrderModalVisible(false);
-    message.success("পণ্য অর্ডারে যোগ করা হয়েছে!");
-  };
-
-  const handleScanOrder = (values) => {
-    const total = values.salePrice * values.quantity;
-    const newItem = {
-      key: Date.now(),
-      productId: values.productId,
-      productName: values.productName,
-      category: values.category,
-      unitPrice: values.unitPrice,
-      salePrice: values.salePrice,
-      quantity: values.quantity,
-      total: total,
-    };
-
-    setOrderItems([...orderItems, newItem]);
-    scanForm.resetFields();
-    setScanModalVisible(false);
-    setScanning(false);
-    message.success("স্ক্যান করা পণ্য অর্ডারে যোগ করা হয়েছে!");
-  };
-
-  const removeOrderItem = (key) => {
-    setOrderItems(orderItems.filter((item) => item.key !== key));
-    message.success("পণ্য অর্ডার থেকে সরানো হয়েছে!");
-  };
-
-  const updateOrderItem = (key, field, value) => {
-    const updatedItems = orderItems.map((item) => {
-      if (item.key === key) {
-        const updatedItem = { ...item, [field]: value };
-
-        // Recalculate total if quantity or sale price changes
-        if (field === "quantity" || field === "salePrice") {
-          updatedItem.total = updatedItem.salePrice * updatedItem.quantity;
-        }
-
-        return updatedItem;
-      }
-      return item;
-    });
-    setOrderItems(updatedItems);
-  };
-
-  const submitOrder = async () => {
-    if (!customerInfo.name || !customerInfo.phone || !customerInfo.address) {
-      message.error("গ্রাহকের সকল তথ্য প্রয়োজন!");
-      return;
-    }
-
-    if (orderItems.length === 0) {
-      message.error("অর্ডারে কমপক্ষে একটি পণ্য যোগ করুন!");
-      return;
-    }
+    console.log("Order Data to be sent:", orderData);
 
     setOrderSubmitting(true);
     try {
-      const orderData = {
-        customerName: customerInfo.name,
-        customerPhone: customerInfo.phone,
-        customerAddress: customerInfo.address,
-        items: orderItems,
-        totalAmount: totalAmount,
-        grandTotal: totalAmount,
-        paymentMethod: "Cash",
-        orderDate: new Date().toISOString(),
-        createdBy: "user",
-      };
-
-      const response = await coreAxios.post("/orders", orderData);
+      const response = await coreAxios.post("/productOrders", orderData);
 
       if (response.data.success) {
         message.success({
@@ -357,17 +326,95 @@ const OrderEntry = () => {
 
         // Reset and refresh data
         setCustomerInfo({ name: "", phone: "", address: "" });
-        setOrderItems([]);
         addOrderForm.resetFields();
-        scanForm.resetFields();
+        setAddOrderModalVisible(false);
         fetchOrders();
         fetchFinancialSummary();
       } else {
-        message.error("অর্ডার তৈরি করতে সমস্যা হয়েছে!");
+        message.error(
+          response.data.message || "অর্ডার তৈরি করতে সমস্যা হয়েছে!"
+        );
       }
     } catch (error) {
       console.error("Error creating order:", error);
-      message.error("অর্ডার তৈরি করতে সমস্যা হয়েছে!");
+      message.error(
+        error.response?.data?.message || "অর্ডার তৈরি করতে সমস্যা হয়েছে!"
+      );
+    } finally {
+      setOrderSubmitting(false);
+    }
+  };
+
+  const handleScanOrder = async (values) => {
+    console.log("Scanned Order Values:", values);
+
+    // Validate required fields
+    if (!values.productName || !values.productId) {
+      message.error("পণ্যের নাম এবং আইডি প্রয়োজন!");
+      return;
+    }
+
+    const total = values.salePrice * values.quantity;
+
+    // Create order immediately when scanning product
+    const orderData = {
+      productId: values.productId,
+      productName: values.productName,
+      category: values.category,
+      unitPrice: values.unitPrice,
+      salePrice: values.salePrice,
+      quantity: values.quantity,
+      total: total,
+      customerName: values.customerName || "Walk-in Customer",
+      customerPhone: values.customerPhone || "N/A",
+      customerAddress: values.customerAddress || "N/A",
+
+      totalAmount: total,
+      grandTotal: total,
+      paymentMethod: "Cash",
+      createdBy: "user",
+      status: "Pending", // Default status
+    };
+
+    console.log("Order Data to be sent:", orderData);
+
+    setOrderSubmitting(true);
+    try {
+      const response = await coreAxios.post("/productOrders", orderData);
+
+      if (response.data.success) {
+        message.success({
+          content: (
+            <div>
+              <CheckCircleOutlined
+                style={{ color: "#52c41a", marginRight: 8 }}
+              />
+              অর্ডার সফলভাবে তৈরি হয়েছে!
+              <br />
+              <Text type="secondary" style={{ fontSize: "12px" }}>
+                অর্ডার নম্বর: {response.data.data.orderNo}
+              </Text>
+            </div>
+          ),
+          duration: 5,
+        });
+
+        // Reset and refresh data
+        scanForm.resetFields();
+        setScanModalVisible(false);
+        setScanning(false);
+        fetchOrders();
+        fetchFinancialSummary();
+      } else {
+        message.error(
+          response.data.message || "অর্ডার তৈরি করতে সমস্যা হয়েছে!"
+        );
+      }
+    } catch (error) {
+      console.error("Error creating order:", error);
+      message.error(
+        error.response?.data?.message || "অর্ডার তৈরি করতে সমস্যা হয়েছে!"
+      );
     } finally {
       setOrderSubmitting(false);
     }
@@ -383,14 +430,53 @@ const OrderEntry = () => {
         category: selectedProduct.category,
         unitPrice: selectedProduct.unitPrice,
         salePrice: selectedProduct.unitPrice,
+        quantity: 1, // Set default quantity to 1
+        availableQuantity: selectedProduct.quantity || 100, // Set available quantity
       });
     }
+  };
+
+  // Quantity validator to ensure it doesn't exceed available quantity
+  const validateQuantity = (_, value) => {
+    const availableQuantity =
+      addOrderForm.getFieldValue("availableQuantity") ||
+      scanForm.getFieldValue("availableQuantity") ||
+      100;
+
+    if (value && value > availableQuantity) {
+      return Promise.reject(
+        new Error(`পরিমাণ ${availableQuantity} এর বেশি হতে পারবে না`)
+      );
+    }
+    if (value && value < 1) {
+      return Promise.reject(new Error("পরিমাণ ১ এর কম হতে পারবে না"));
+    }
+    return Promise.resolve();
   };
 
   // View Order Details
   const viewOrderDetails = (order) => {
     setSelectedOrder(order);
     setViewOrderModalVisible(true);
+  };
+
+  // Update Order Status
+  const updateOrderStatus = async (orderId, newStatus) => {
+    try {
+      const response = await coreAxios.put(`/productOrders/${orderId}`, {
+        status: newStatus,
+      });
+      if (response.data.success) {
+        message.success("অর্ডার স্ট্যাটাস সফলভাবে আপডেট হয়েছে!");
+        fetchOrders();
+        fetchFinancialSummary();
+      } else {
+        message.error("স্ট্যাটাস আপডেট করতে সমস্যা হয়েছে!");
+      }
+    } catch (error) {
+      console.error("Error updating order status:", error);
+      message.error("স্ট্যাটাস আপডেট করতে সমস্যা হয়েছে!");
+    }
   };
 
   // Edit Order
@@ -409,7 +495,7 @@ const OrderEntry = () => {
   const updateOrder = async (values) => {
     try {
       const response = await coreAxios.put(
-        `/orders/${selectedOrder._id}`,
+        `/productOrders/${selectedOrder._id}`,
         values
       );
       if (response.data.success) {
@@ -436,7 +522,7 @@ const OrderEntry = () => {
       okType: "danger",
       onOk: async () => {
         try {
-          const response = await coreAxios.delete(`/orders/${orderId}`);
+          const response = await coreAxios.delete(`/productOrders/${orderId}`);
           if (response.data.success) {
             message.success("অর্ডার সফলভাবে ডিলিট হয়েছে!");
             fetchOrders();
@@ -450,67 +536,24 @@ const OrderEntry = () => {
     });
   };
 
-  // Order Items Columns
-  const columns = [
-    {
-      title: "পণ্যের নাম",
-      dataIndex: "productName",
-      key: "productName",
-      render: (text) => <Text strong>{text}</Text>,
-    },
-    {
-      title: "দাম",
-      dataIndex: "salePrice",
-      key: "salePrice",
-      render: (price, record) => (
-        <InputNumber
-          min={1}
-          value={price}
-          onChange={(value) => updateOrderItem(record.key, "salePrice", value)}
-          formatter={(value) => `৳ ${value}`}
-          parser={(value) => value.replace(/৳\s?/g, "")}
-          size="small"
-          style={{ width: "100px" }}
-        />
-      ),
-    },
-    {
-      title: "পরিমাণ",
-      dataIndex: "quantity",
-      key: "quantity",
-      render: (quantity, record) => (
-        <InputNumber
-          min={1}
-          max={1000}
-          value={quantity}
-          onChange={(value) => updateOrderItem(record.key, "quantity", value)}
-          size="small"
-          style={{ width: "80px" }}
-        />
-      ),
-    },
-    {
-      title: "মোট",
-      dataIndex: "total",
-      key: "total",
-      render: (total) => <Text strong>৳{total}</Text>,
-    },
-    {
-      title: "কর্ম",
-      key: "action",
-      render: (_, record) => (
-        <Tooltip title="মুছুন">
-          <Button
-            type="text"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => removeOrderItem(record.key)}
-            size="small"
-          />
-        </Tooltip>
-      ),
-    },
-  ];
+  // Status update handler
+  const handleStatusChange = (orderId, currentStatus) => {
+    let newStatus;
+    switch (currentStatus) {
+      case "Pending":
+        newStatus = "Processing";
+        break;
+      case "Processing":
+        newStatus = "Completed";
+        break;
+      case "Completed":
+        newStatus = "Pending";
+        break;
+      default:
+        newStatus = "Pending";
+    }
+    updateOrderStatus(orderId, newStatus);
+  };
 
   // Order Table Columns
   const orderColumns = [
@@ -540,21 +583,31 @@ const OrderEntry = () => {
       title: "স্ট্যাটাস",
       dataIndex: "status",
       key: "status",
-      render: (status) => {
-        const color =
-          status === "Completed"
-            ? "green"
-            : status === "Pending"
-            ? "orange"
-            : "red";
-        return <Tag color={color}>{status}</Tag>;
-      },
+      render: (status, record) => (
+        <Tooltip title="স্ট্যাটাস পরিবর্তন করতে ক্লিক করুন">
+          <Tag
+            color={
+              status === "Completed"
+                ? "green"
+                : status === "Processing"
+                ? "blue"
+                : status === "Cancelled"
+                ? "red"
+                : "orange"
+            }
+            className="cursor-pointer"
+            onClick={() => handleStatusChange(record._id, status)}
+          >
+            {status}
+          </Tag>
+        </Tooltip>
+      ),
     },
     {
       title: "তারিখ",
       dataIndex: "orderDate",
       key: "orderDate",
-      render: (date) => dayjs(date).format("DD/MM/YYYY"),
+      render: (date) => dayjs(date).format("DD/MM/YYYY HH:mm"),
     },
     {
       title: "কর্ম",
@@ -591,9 +644,6 @@ const OrderEntry = () => {
     },
   ];
 
-  const totalAmount = orderItems.reduce((sum, item) => sum + item.total, 0);
-  const totalItems = orderItems.reduce((sum, item) => sum + item.quantity, 0);
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -603,249 +653,88 @@ const OrderEntry = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-4 px-4 pt-20">
-      <div className="max-w-7xl mx-auto">
-        {/* Header Section */}
-        <div className="mb-6 text-center">
-          <Title level={2} className="text-gray-800 mb-2">
-            🛒 অর্ডার ম্যানেজমেন্ট
-          </Title>
-          <Text className="text-gray-600">
-            নতুন অর্ডার তৈরি এবং ব্যবস্থাপনা করুন
-          </Text>
-        </div>
+    <div className="">
+      {/* Gradient Header with Waves */}
+      <div className="absolute top-0 left-0 right-0 h-64 bg-gradient-to-r from-[#6ECB63] to-[#5B8FF9] overflow-hidden z-0">
+        <svg
+          className="absolute bottom-0 left-0 right-0"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 1440 320"
+        >
+          <path
+            fill="rgba(255, 255, 255, 0.3)"
+            d="M0,256L48,261.3C96,267,192,277,288,250.7C384,224,480,160,576,160C672,160,768,224,864,218.7C960,213,1056,139,1152,117.3C1248,96,1344,128,1392,144L1440,160L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"
+          ></path>
+        </svg>
+      </div>
 
+      <div className=" ">
         {/* Financial Summary Dashboard */}
         {financialSummary && (
-          <Card className="shadow-lg rounded-xl mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <Title level={4} className="m-0">
-                <BarChartOutlined className="mr-2 text-blue-500" />
-                ড্যাশবোর্ড সামারি
-              </Title>
-              <Button
-                icon={<ReloadOutlined />}
-                onClick={fetchFinancialSummary}
-                size="small"
-              >
-                রিফ্রেশ
-              </Button>
-            </div>
-            <Row gutter={16}>
-              <Col xs={12} sm={6} className="mb-3">
-                <Card size="small" className="text-center shadow-sm">
-                  <Statistic
-                    title="আজকের বিক্রয়"
-                    value={financialSummary.daily?.sales || 0}
-                    prefix="৳"
-                    valueStyle={{ color: "#3f8600" }}
-                  />
-                </Card>
+          <Card>
+            <Row gutter={16} className="">
+              <Col xs={24} sm={12} md={8} className="mb-3">
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  size="large"
+                  onClick={() => setAddOrderModalVisible(true)}
+                  className="w-full h-12 rounded-lg"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, #6ECB63 0%, #5B8FF9 100%)",
+                    border: "none",
+                    fontFamily: "Inter, sans-serif",
+                    fontWeight: 500,
+                  }}
+                >
+                  নতুন অর্ডার
+                </Button>
               </Col>
-              <Col xs={12} sm={6} className="mb-3">
-                <Card size="small" className="text-center shadow-sm">
-                  <Statistic
-                    title="আজকের অর্ডার"
-                    value={financialSummary.daily?.orders || 0}
-                    valueStyle={{ color: "#1890ff" }}
-                  />
-                </Card>
-              </Col>
-              <Col xs={12} sm={6} className="mb-3">
-                <Card size="small" className="text-center shadow-sm">
-                  <Statistic
-                    title="মাসিক বিক্রয়"
-                    value={financialSummary.monthly?.sales || 0}
-                    prefix="৳"
-                    valueStyle={{ color: "#cf1322" }}
-                  />
-                </Card>
-              </Col>
-              <Col xs={12} sm={6} className="mb-3">
-                <Card size="small" className="text-center shadow-sm">
-                  <Statistic
-                    title="মাসিক অর্ডার"
-                    value={financialSummary.monthly?.orders || 0}
-                    valueStyle={{ color: "#722ed1" }}
-                  />
-                </Card>
+              <Col xs={24} sm={12} md={8} className="mb-3">
+                <Button
+                  icon={<QrcodeOutlined />}
+                  size="large"
+                  onClick={startQRScanner}
+                  className="w-full h-12 rounded-lg border-0"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.9)",
+                    boxShadow: "0 4px 15px rgba(0, 0, 0, 0.1)",
+                    fontFamily: "Inter, sans-serif",
+                    fontWeight: 500,
+                  }}
+                >
+                  QR স্ক্যান করুন
+                </Button>
               </Col>
             </Row>
           </Card>
         )}
 
         {/* Main Order Card */}
-        <Card className="shadow-lg rounded-xl mb-6">
-          {/* Action Buttons */}
-          <Row gutter={16} className="mb-6">
-            <Col xs={24} sm={12} md={8} className="mb-3">
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                size="large"
-                onClick={() => setAddOrderModalVisible(true)}
-                className="w-full h-12"
-                block
-              >
-                নতুন অর্ডার
-              </Button>
-            </Col>
-            <Col xs={24} sm={12} md={8} className="mb-3">
-              <Button
-                icon={<QrcodeOutlined />}
-                size="large"
-                onClick={startQRScanner}
-                className="w-full h-12"
-                block
-              >
-                QR স্ক্যান করুন
-              </Button>
-            </Col>
-          </Row>
-
-          {/* Customer Information */}
-          <Card
-            title={
-              <span>
-                <UserOutlined className="mr-2" />
-                গ্রাহকের তথ্য
-              </span>
-            }
-            className="mb-6"
-            size="small"
-          >
-            <Row gutter={16}>
-              <Col xs={24} md={8} className="mb-3">
-                <Input
-                  placeholder="গ্রাহকের নাম*"
-                  prefix={<UserOutlined />}
-                  value={customerInfo.name}
-                  onChange={(e) =>
-                    setCustomerInfo({ ...customerInfo, name: e.target.value })
-                  }
-                  size="large"
-                />
-              </Col>
-              <Col xs={24} md={8} className="mb-3">
-                <Input
-                  placeholder="ফোন নম্বর*"
-                  prefix={<PhoneOutlined />}
-                  value={customerInfo.phone}
-                  onChange={(e) =>
-                    setCustomerInfo({ ...customerInfo, phone: e.target.value })
-                  }
-                  size="large"
-                />
-              </Col>
-              <Col xs={24} md={8} className="mb-3">
-                <Input
-                  placeholder="ঠিকানা*"
-                  prefix={<HomeOutlined />}
-                  value={customerInfo.address}
-                  onChange={(e) =>
-                    setCustomerInfo({
-                      ...customerInfo,
-                      address: e.target.value,
-                    })
-                  }
-                  size="large"
-                />
-              </Col>
-            </Row>
-          </Card>
-
-          {/* Current Order Summary */}
-          {orderItems.length > 0 && (
-            <Card
-              title={`বর্তমান অর্ডার (${orderItems.length}টি পণ্য)`}
-              className="mb-6"
-              size="small"
-            >
-              <Row gutter={16} className="mb-4">
-                <Col xs={12} sm={8}>
-                  <div className="text-center">
-                    <Text strong>মোট পণ্য</Text>
-                    <div className="text-lg font-bold text-blue-600">
-                      {orderItems.length}
-                    </div>
-                  </div>
-                </Col>
-                <Col xs={12} sm={8}>
-                  <div className="text-center">
-                    <Text strong>মোট আইটেম</Text>
-                    <div className="text-lg font-bold text-green-600">
-                      {totalItems}
-                    </div>
-                  </div>
-                </Col>
-                <Col xs={24} sm={8}>
-                  <div className="text-center">
-                    <Text strong>মোট Amount</Text>
-                    <div className="text-lg font-bold text-red-600">
-                      ৳{totalAmount}
-                    </div>
-                  </div>
-                </Col>
-              </Row>
-
-              <Table
-                columns={columns}
-                dataSource={orderItems}
-                pagination={false}
-                scroll={{ x: 500 }}
-                size="small"
-              />
-
-              <div className="text-center mt-4">
-                <Button
-                  type="primary"
-                  size="large"
-                  onClick={submitOrder}
-                  loading={orderSubmitting}
-                  className="min-w-48 h-12"
-                  disabled={
-                    !customerInfo.name ||
-                    !customerInfo.phone ||
-                    !customerInfo.address
-                  }
-                  icon={
-                    orderSubmitting ? (
-                      <LoadingOutlined />
-                    ) : (
-                      <CheckCircleOutlined />
-                    )
-                  }
-                >
-                  {orderSubmitting ? "প্রসেসিং..." : "অর্ডার কনফার্ম করুন"}
-                </Button>
-              </div>
-            </Card>
-          )}
-
-          {/* Empty State */}
-          {orderItems.length === 0 && (
-            <div className="text-center py-8">
-              <ShoppingCartOutlined className="text-4xl text-gray-400 mb-4" />
-              <Title level={4} className="text-gray-500 mb-2">
-                কোন অর্ডার আইটেম নেই
-              </Title>
-              <Text className="text-gray-400">
-                নতুন অর্ডার যোগ করতে উপরের বাটন ব্যবহার করুন
-              </Text>
-            </div>
-          )}
-        </Card>
 
         {/* All Orders Table */}
-        <Card className="shadow-lg rounded-xl">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
-            <Title level={4} className="m-0">
+        <Card
+          className="rounded-xl border-0"
+          // style={{
+          //   background: "rgba(255, 255, 255, 0.95)",
+          //   boxShadow: "0 8px 32px rgba(31, 38, 135, 0.1)",
+          //   backdropFilter: "blur(4px)",
+          // }}
+        >
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+            <Title
+              level={4}
+              className="m-0"
+              style={{ fontFamily: "Poppins, sans-serif" }}
+            >
               সকল অর্ডার
             </Title>
             <Button
               onClick={fetchOrders}
               icon={<ReloadOutlined />}
               loading={loading}
+              className="rounded-lg mb-2"
             >
               রিফ্রেশ
             </Button>
@@ -857,6 +746,8 @@ const OrderEntry = () => {
             scroll={{ x: 800 }}
             pagination={{ pageSize: 10 }}
             size="middle"
+            className="rounded-lg"
+            rowKey="_id"
           />
         </Card>
 
@@ -867,113 +758,155 @@ const OrderEntry = () => {
           onCancel={() => setAddOrderModalVisible(false)}
           footer={null}
           width={700}
+          className="rounded-lg"
         >
           <Form
             form={addOrderForm}
             onFinish={handleAddOrder}
             layout="vertical"
             className="mt-4"
+            initialValues={{
+              quantity: 1, // Set default quantity to 1
+            }}
           >
-            <Row gutter={16}>
-              <Col xs={24} md={12}>
-                <Form.Item
-                  name="category"
-                  label="ক্যাটাগরি"
-                  rules={[
-                    { required: true, message: "ক্যাটাগরি নির্বাচন করুন" },
-                  ]}
-                >
-                  <Select
-                    placeholder="ক্যাটাগরি নির্বাচন করুন"
-                    onChange={fetchProductsByCategory}
-                    size="large"
-                  >
-                    {categories.map((category) => (
-                      <Option
-                        key={category.categoryCode}
-                        value={category.categoryCode}
-                      >
-                        {category.categoryName}
-                      </Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={12}>
-                <Form.Item
-                  name="productId"
-                  label="পণ্য"
-                  rules={[{ required: true, message: "পণ্য নির্বাচন করুন" }]}
-                >
-                  <Select
-                    placeholder="পণ্য নির্বাচন করুন"
-                    size="large"
-                    showSearch
-                    onChange={handleProductSelect}
-                    filterOption={(input, option) =>
-                      option.children
-                        .toLowerCase()
-                        .includes(input.toLowerCase())
-                    }
-                  >
-                    {products.map((product) => (
-                      <Option key={product.productId} value={product.productId}>
-                        {product.productName} - ৳{product.unitPrice}
-                      </Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-              </Col>
-            </Row>
+            {/* Customer Information in Modal - Not Required */}
+            <Card title="গ্রাহকের তথ্য (ঐচ্ছিক)" size="small" className="mb-4">
+              <Row gutter={16}>
+                <Col xs={24} md={8}>
+                  <Form.Item name="customerName" label="গ্রাহকের নাম">
+                    <Input
+                      prefix={<UserOutlined />}
+                      placeholder="গ্রাহকের নাম"
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={8}>
+                  <Form.Item name="customerPhone" label="ফোন নম্বর">
+                    <Input prefix={<PhoneOutlined />} placeholder="ফোন নম্বর" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={8}>
+                  <Form.Item name="customerAddress" label="ঠিকানা">
+                    <Input prefix={<HomeOutlined />} placeholder="ঠিকানা" />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </Card>
 
-            <Row gutter={16}>
-              <Col xs={24} md={8}>
-                <Form.Item name="unitPrice" label="ইউনিট প্রাইস">
-                  <InputNumber
-                    className="w-full"
-                    min={1}
-                    formatter={(value) => `৳ ${value}`}
-                    parser={(value) => value.replace(/৳\s?/g, "")}
-                    size="large"
-                    readOnly
-                  />
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={8}>
-                <Form.Item
-                  name="salePrice"
-                  label="সেল প্রাইস"
-                  rules={[{ required: true, message: "সেল প্রাইস লিখুন" }]}
-                >
-                  <InputNumber
-                    className="w-full"
-                    min={1}
-                    formatter={(value) => `৳ ${value}`}
-                    parser={(value) => value.replace(/৳\s?/g, "")}
-                    size="large"
-                  />
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={8}>
-                <Form.Item
-                  name="quantity"
-                  label="পরিমাণ"
-                  rules={[{ required: true, message: "পরিমাণ লিখুন" }]}
-                >
-                  <InputNumber
-                    className="w-full"
-                    min={1}
-                    defaultValue={1}
-                    size="large"
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
+            <Card title="পণ্যের তথ্য" size="small">
+              <Row gutter={16}>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name="category"
+                    label="ক্যাটাগরি"
+                    rules={[
+                      { required: true, message: "ক্যাটাগরি নির্বাচন করুন" },
+                    ]}
+                  >
+                    <Select
+                      placeholder="ক্যাটাগরি নির্বাচন করুন"
+                      onChange={fetchProductsByCategory}
+                      size="large"
+                    >
+                      {categories.map((category) => (
+                        <Option
+                          key={category.categoryCode}
+                          value={category.categoryCode}
+                        >
+                          {category.categoryName}
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name="productId"
+                    label="পণ্য"
+                    rules={[{ required: true, message: "পণ্য নির্বাচন করুন" }]}
+                  >
+                    <Select
+                      placeholder="পণ্য নির্বাচন করুন"
+                      size="large"
+                      showSearch
+                      onChange={handleProductSelect}
+                      filterOption={(input, option) =>
+                        option.children
+                          .toLowerCase()
+                          .includes(input.toLowerCase())
+                      }
+                    >
+                      {products.map((product) => (
+                        <Option
+                          key={product.productId}
+                          value={product.productId}
+                        >
+                          {product.productName} - ৳{product.unitPrice}
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Row gutter={16}>
+                <Col xs={24} md={8}>
+                  <Form.Item name="productName" label="পণ্যের নাম" hidden>
+                    <Input />
+                  </Form.Item>
+                  <Form.Item name="unitPrice" label="ইউনিট প্রাইস">
+                    <InputNumber
+                      className="w-full"
+                      min={1}
+                      formatter={(value) => `৳ ${value}`}
+                      parser={(value) => value.replace(/৳\s?/g, "")}
+                      size="large"
+                      readOnly
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={8}>
+                  <Form.Item
+                    name="salePrice"
+                    label="সেল প্রাইস"
+                    rules={[{ required: true, message: "সেল প্রাইস লিখুন" }]}
+                  >
+                    <InputNumber
+                      className="w-full"
+                      min={1}
+                      formatter={(value) => `৳ ${value}`}
+                      parser={(value) => value.replace(/৳\s?/g, "")}
+                      size="large"
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={8}>
+                  <Form.Item
+                    name="quantity"
+                    label="পরিমাণ"
+                    rules={[
+                      { required: true, message: "পরিমাণ লিখুন" },
+                      { validator: validateQuantity },
+                    ]}
+                  >
+                    <InputNumber
+                      className="w-full"
+                      min={1}
+                      defaultValue={1}
+                      size="large"
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Form.Item name="availableQuantity" hidden>
+                <Input />
+              </Form.Item>
+            </Card>
 
             <div className="text-right pt-4 border-t">
               <Button
                 onClick={() => setAddOrderModalVisible(false)}
-                className="mr-2"
+                className="mr-2 rounded-lg"
                 size="large"
               >
                 বাতিল
@@ -983,8 +916,10 @@ const OrderEntry = () => {
                 htmlType="submit"
                 size="large"
                 icon={<PlusOutlined />}
+                className="rounded-lg"
+                loading={orderSubmitting}
               >
-                অর্ডার যোগ করুন
+                {orderSubmitting ? "প্রসেসিং..." : "অর্ডার তৈরি করুন"}
               </Button>
             </div>
           </Form>
@@ -997,6 +932,7 @@ const OrderEntry = () => {
           onCancel={() => setViewOrderModalVisible(false)}
           footer={null}
           width={700}
+          className="rounded-lg"
         >
           {selectedOrder && (
             <div>
@@ -1016,7 +952,13 @@ const OrderEntry = () => {
                 <Descriptions.Item label="স্ট্যাটাস">
                   <Tag
                     color={
-                      selectedOrder.status === "Completed" ? "green" : "orange"
+                      selectedOrder.status === "Completed"
+                        ? "green"
+                        : selectedOrder.status === "Processing"
+                        ? "blue"
+                        : selectedOrder.status === "Cancelled"
+                        ? "red"
+                        : "orange"
                     }
                   >
                     {selectedOrder.status}
@@ -1024,6 +966,12 @@ const OrderEntry = () => {
                 </Descriptions.Item>
                 <Descriptions.Item label="মোট Amount">
                   <Text strong>৳{selectedOrder.grandTotal}</Text>
+                </Descriptions.Item>
+                <Descriptions.Item label="পেমেন্ট মেথড">
+                  {selectedOrder.paymentMethod}
+                </Descriptions.Item>
+                <Descriptions.Item label="অর্ডার তারিখ">
+                  {dayjs(selectedOrder.orderDate).format("DD/MM/YYYY HH:mm")}
                 </Descriptions.Item>
               </Descriptions>
 
@@ -1052,6 +1000,7 @@ const OrderEntry = () => {
                 dataSource={selectedOrder.items}
                 pagination={false}
                 size="small"
+                rowKey="productId"
               />
             </div>
           )}
@@ -1064,6 +1013,7 @@ const OrderEntry = () => {
           onCancel={() => setEditOrderModalVisible(false)}
           footer={null}
           width={500}
+          className="rounded-lg"
         >
           <Form
             form={editOrderForm}
@@ -1083,6 +1033,7 @@ const OrderEntry = () => {
             <Form.Item name="status" label="স্ট্যাটাস">
               <Select size="large">
                 <Option value="Pending">Pending</Option>
+                <Option value="Processing">Processing</Option>
                 <Option value="Completed">Completed</Option>
                 <Option value="Cancelled">Cancelled</Option>
               </Select>
@@ -1090,12 +1041,17 @@ const OrderEntry = () => {
             <div className="text-right pt-4 border-t">
               <Button
                 onClick={() => setEditOrderModalVisible(false)}
-                className="mr-2"
+                className="mr-2 rounded-lg"
                 size="large"
               >
                 বাতিল
               </Button>
-              <Button type="primary" htmlType="submit" size="large">
+              <Button
+                type="primary"
+                htmlType="submit"
+                size="large"
+                className="rounded-lg"
+              >
                 আপডেট করুন
               </Button>
             </div>
@@ -1115,6 +1071,7 @@ const OrderEntry = () => {
           }}
           footer={null}
           width={600}
+          className="rounded-lg"
         >
           <div className="mb-4">
             {scanning && (
@@ -1139,62 +1096,111 @@ const OrderEntry = () => {
               </div>
             )}
 
-            <Form form={scanForm} onFinish={handleScanOrder} layout="vertical">
-              <Row gutter={16}>
-                <Col xs={24} md={12}>
-                  <Form.Item name="productName" label="পণ্যের নাম">
-                    <Input size="large" readOnly />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} md={12}>
-                  <Form.Item name="category" label="ক্যাটাগরি">
-                    <Input size="large" readOnly />
-                  </Form.Item>
-                </Col>
-              </Row>
+            <Form
+              form={scanForm}
+              onFinish={handleScanOrder}
+              layout="vertical"
+              initialValues={{
+                quantity: 1, // Set default quantity to 1
+              }}
+            >
+              {/* Customer Information in Scan Modal - Not Required */}
+              <Card
+                title="গ্রাহকের তথ্য (ঐচ্ছিক)"
+                size="small"
+                className="mb-4"
+              >
+                <Row gutter={16}>
+                  <Col xs={24} md={8}>
+                    <Form.Item name="customerName" label="গ্রাহকের নাম">
+                      <Input
+                        prefix={<UserOutlined />}
+                        placeholder="গ্রাহকের নাম"
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={8}>
+                    <Form.Item name="customerPhone" label="ফোন নম্বর">
+                      <Input
+                        prefix={<PhoneOutlined />}
+                        placeholder="ফোন নম্বর"
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={8}>
+                    <Form.Item name="customerAddress" label="ঠিকানা">
+                      <Input prefix={<HomeOutlined />} placeholder="ঠিকানা" />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              </Card>
 
-              <Row gutter={16}>
-                <Col xs={24} md={8}>
-                  <Form.Item name="unitPrice" label="ইউনিট প্রাইস">
-                    <InputNumber
-                      className="w-full"
-                      formatter={(value) => `৳ ${value}`}
-                      parser={(value) => value.replace(/৳\s?/g, "")}
-                      size="large"
-                      readOnly
-                    />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} md={8}>
-                  <Form.Item
-                    name="salePrice"
-                    label="সেল প্রাইস"
-                    rules={[{ required: true, message: "সেল প্রাইস লিখুন" }]}
-                  >
-                    <InputNumber
-                      className="w-full"
-                      min={1}
-                      formatter={(value) => `৳ ${value}`}
-                      parser={(value) => value.replace(/৳\s?/g, "")}
-                      size="large"
-                    />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} md={8}>
-                  <Form.Item
-                    name="quantity"
-                    label="পরিমাণ"
-                    rules={[{ required: true, message: "পরিমাণ লিখুন" }]}
-                  >
-                    <InputNumber
-                      className="w-full"
-                      min={1}
-                      defaultValue={1}
-                      size="large"
-                    />
-                  </Form.Item>
-                </Col>
-              </Row>
+              <Card title="স্ক্যান করা পণ্য" size="small">
+                <Row gutter={16}>
+                  <Col xs={24} md={12}>
+                    <Form.Item name="productName" label="পণ্যের নাম">
+                      <Input size="large" readOnly />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Form.Item name="category" label="ক্যাটাগরি">
+                      <Input size="large" readOnly />
+                    </Form.Item>
+                  </Col>
+                </Row>
+
+                <Row gutter={16}>
+                  <Col xs={24} md={8}>
+                    <Form.Item name="productId" label="পণ্য আইডি" hidden>
+                      <Input />
+                    </Form.Item>
+                    <Form.Item name="unitPrice" label="ইউনিট প্রাইস">
+                      <InputNumber
+                        className="w-full"
+                        formatter={(value) => `৳ ${value}`}
+                        parser={(value) => value.replace(/৳\s?/g, "")}
+                        size="large"
+                        readOnly
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={8}>
+                    <Form.Item
+                      name="salePrice"
+                      label="সেল প্রাইস"
+                      rules={[{ required: true, message: "সেল প্রাইস লিখুন" }]}
+                    >
+                      <InputNumber
+                        className="w-full"
+                        min={1}
+                        formatter={(value) => `৳ ${value}`}
+                        parser={(value) => value.replace(/৳\s?/g, "")}
+                        size="large"
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={8}>
+                    <Form.Item
+                      name="quantity"
+                      label="পরিমাণ"
+                      rules={[
+                        { required: true, message: "পরিমাণ লিখুন" },
+                        { validator: validateQuantity },
+                      ]}
+                    >
+                      <InputNumber
+                        className="w-full"
+                        min={1}
+                        defaultValue={1}
+                        size="large"
+                      />
+                    </Form.Item>
+                  </Col>
+                </Row>
+                <Form.Item name="availableQuantity" hidden>
+                  <Input />
+                </Form.Item>
+              </Card>
 
               <div className="text-right pt-4 border-t">
                 <Button
@@ -1202,13 +1208,19 @@ const OrderEntry = () => {
                     setScanModalVisible(false);
                     setScanning(false);
                   }}
-                  className="mr-2"
+                  className="mr-2 rounded-lg"
                   size="large"
                 >
                   বাতিল
                 </Button>
-                <Button type="primary" htmlType="submit" size="large">
-                  অর্ডার যোগ করুন
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  size="large"
+                  className="rounded-lg"
+                  loading={orderSubmitting}
+                >
+                  {orderSubmitting ? "প্রসেসিং..." : "অর্ডার তৈরি করুন"}
                 </Button>
               </div>
             </Form>
