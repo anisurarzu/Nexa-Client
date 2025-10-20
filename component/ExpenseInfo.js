@@ -712,7 +712,7 @@ const ExpenseInfo = () => {
         </div>
       </Card>
 
-      {/* Main Table */}
+      {/* Main Table ______________ */}
       <Card>
         <Table
           columns={columns}
