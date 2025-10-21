@@ -11,8 +11,6 @@ import {
   Pagination,
   Form,
   Input,
-  Dropdown,
-  Menu,
   Select,
   Upload,
   Image,
@@ -26,28 +24,23 @@ import {
   InputNumber,
   Grid,
   Drawer,
-  List,
-  Avatar,
   Badge,
   DatePicker,
 } from "antd";
 import {
   EditOutlined,
   DeleteOutlined,
-  DownOutlined,
   UploadOutlined,
   PlusOutlined,
   SearchOutlined,
   ShoppingOutlined,
   InboxOutlined,
   ExclamationCircleOutlined,
-  EyeOutlined,
-  ReloadOutlined,
   DollarOutlined,
   FilterOutlined,
-  MenuOutlined,
-  CloseOutlined,
+  ReloadOutlined,
   CalendarOutlined,
+  CloseOutlined,
 } from "@ant-design/icons";
 import { useFormik } from "formik";
 import dayjs from "dayjs";
@@ -100,7 +93,6 @@ const InventoryPage = () => {
     outOfStock: 0,
   });
   const [filterDrawerVisible, setFilterDrawerVisible] = useState(false);
-  const [mobileView, setMobileView] = useState("list");
 
   const screens = useBreakpoint();
   const isMobile = !screens.md;
@@ -180,7 +172,7 @@ const InventoryPage = () => {
       unitPrice: 0,
       stockQTY: 0,
       purchaseBy: "",
-      purchaseDate: null, // New field for buying date
+      purchaseDate: null,
       createdBy: userInfo?.loginID,
       createdDate: dayjs().format("YYYY-MM-DD HH:mm:ss"),
       imageUrl: "",
@@ -193,14 +185,13 @@ const InventoryPage = () => {
           stockQTY: values?.stockQTY || values?.qty || 0,
           purchaseDate: values.purchaseDate
             ? dayjs(values.purchaseDate).format("YYYY-MM-DD")
-            : null, // Format purchase date
+            : null,
           createdDate: dayjs().format("YYYY-MM-DD HH:mm:ss"),
         };
 
         let res;
 
         if (isEditing) {
-          console.log("Editing Key:", editingKey);
           res = await coreAxios.put(`products/${editingKey}`, newInventoryItem);
           if (res?.status === 200) {
             if (values.image) {
@@ -257,7 +248,7 @@ const InventoryPage = () => {
       unitPrice: record.unitPrice,
       stockQTY: record.stockQTY,
       purchaseBy: record.purchaseBy,
-      purchaseDate: record.purchaseDate ? dayjs(record.purchaseDate) : null, // Set purchase date
+      purchaseDate: record.purchaseDate ? dayjs(record.purchaseDate) : null,
       createdBy: userInfo?.loginID,
       createdDate: record.createdDate || dayjs().format("YYYY-MM-DD HH:mm:ss"),
     });
@@ -296,8 +287,9 @@ const InventoryPage = () => {
     setPagination({ ...pagination, current: 1 });
   };
 
-  const handleTableChange = (pagination) => {
-    setPagination(pagination);
+  // Fixed pagination handler
+  const handlePaginationChange = (page, pageSize) => {
+    setPagination({ current: page, pageSize });
   };
 
   const getStockStatus = (quantity) => {
@@ -323,13 +315,6 @@ const InventoryPage = () => {
     return category ? category.categoryName : categoryValue;
   };
 
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat("bn-BD", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(price || 0);
-  };
-
   // Format date in Bengali
   const formatDateInBengali = (dateString) => {
     if (!dateString) return "-";
@@ -338,6 +323,13 @@ const InventoryPage = () => {
     const month = toBengaliNumber(date.month() + 1);
     const year = toBengaliNumber(date.year());
     return `${day}/${month}/${year}`;
+  };
+
+  // Get current page data for both table and mobile view
+  const getCurrentPageData = () => {
+    const startIndex = (pagination.current - 1) * pagination.pageSize;
+    const endIndex = startIndex + pagination.pageSize;
+    return filteredInventory.slice(startIndex, endIndex);
   };
 
   // Mobile Card View for Products
@@ -471,7 +463,7 @@ const InventoryPage = () => {
             src={
               imageUrl
                 ? `data:image/jpeg;base64,${imageUrl}`
-                : "/placeholder/40/40"
+                : "https://upload.wikimedia.org/wikipedia/commons/1/14/No_Image_Available.jpg"
             }
             alt="Product"
             width={40}
@@ -886,21 +878,14 @@ const InventoryPage = () => {
         <Spin spinning={loading} size="large">
           {isMobile ? (
             <div className="space-y-3">
-              {filteredInventory
-                .slice(
-                  (pagination.current - 1) * pagination.pageSize,
-                  pagination.current * pagination.pageSize
-                )
-                .map(renderMobileCard)}
+              {getCurrentPageData().map(renderMobileCard)}
 
               <div className="flex justify-center mt-4">
                 <Pagination
                   current={pagination.current}
                   pageSize={pagination.pageSize}
                   total={filteredInventory.length}
-                  onChange={(page, pageSize) =>
-                    setPagination({ current: page, pageSize })
-                  }
+                  onChange={handlePaginationChange}
                   showSizeChanger={false}
                   simple
                   size="small"
@@ -915,30 +900,34 @@ const InventoryPage = () => {
               </div>
             </div>
           ) : (
-            <Table
-              columns={columns}
-              dataSource={filteredInventory.slice(
-                (pagination.current - 1) * pagination.pageSize,
-                pagination.current * pagination.pageSize
-              )}
-              rowKey="productId"
-              pagination={{
-                ...pagination,
-                total: filteredInventory.length,
-                showSizeChanger: true,
-                showQuickJumper: true,
-                pageSizeOptions: ["10", "20", "50", "100"],
-                showTotal: (total, range) =>
-                  `মোট ${toBengaliNumber(
-                    total
-                  )}টি পণ্যের মধ্যে ${toBengaliNumber(
-                    range[0]
-                  )}-${toBengaliNumber(range[1])}টি দেখানো হচ্ছে`,
-                onChange: handleTableChange,
-              }}
-              scroll={{ x: 800 }}
-              className="custom-table"
-            />
+            <>
+              <Table
+                columns={columns}
+                dataSource={getCurrentPageData()}
+                rowKey="productId"
+                pagination={false}
+                scroll={{ x: 800 }}
+                className="custom-table mb-4"
+              />
+              <div className="flex justify-end">
+                <Pagination
+                  current={pagination.current}
+                  pageSize={pagination.pageSize}
+                  total={filteredInventory.length}
+                  onChange={handlePaginationChange}
+                  showSizeChanger
+                  showQuickJumper
+                  pageSizeOptions={["10", "20", "50", "100"]}
+                  showTotal={(total, range) =>
+                    `মোট ${toBengaliNumber(
+                      total
+                    )}টি পণ্যের মধ্যে ${toBengaliNumber(
+                      range[0]
+                    )}-${toBengaliNumber(range[1])}টি দেখানো হচ্ছে`
+                  }
+                />
+              </div>
+            </>
           )}
         </Spin>
       </Card>

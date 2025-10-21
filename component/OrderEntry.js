@@ -168,7 +168,7 @@ const OrderEntry = () => {
     }
   };
 
-  // QR Scanner Logic
+  // FIXED: QR Scanner Logic with Back Camera Priority
   useEffect(() => {
     if (!scanning) return;
 
@@ -179,7 +179,24 @@ const OrderEntry = () => {
       try {
         const cameras = await Html5Qrcode.getCameras();
         if (cameras && cameras.length) {
-          const cameraId = cameras[0].id;
+          // FIX: Prioritize back camera for mobile devices
+          let backCamera = cameras.find(
+            (camera) =>
+              camera.label.toLowerCase().includes("back") ||
+              camera.label.toLowerCase().includes("rear")
+          );
+
+          // If no back camera found, look for environment-facing camera
+          if (!backCamera) {
+            backCamera = cameras.find((camera) =>
+              camera.label.toLowerCase().includes("environment")
+            );
+          }
+
+          // If still no back camera, use the last camera (usually back camera on mobile)
+          const cameraId = backCamera
+            ? backCamera.id
+            : cameras[cameras.length - 1].id;
 
           await html5QrCode.start(
             cameraId,
@@ -564,6 +581,13 @@ const OrderEntry = () => {
       render: (text) => <Text strong>#{text}</Text>,
     },
     {
+      title: "পণ্যের নাম",
+      dataIndex: "productName",
+      key: "productName",
+      render: (text) => <Text strong>#{text}</Text>,
+    },
+
+    {
       title: "গ্রাহক",
       dataIndex: "customerName",
       key: "customerName",
@@ -644,13 +668,7 @@ const OrderEntry = () => {
     },
   ];
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Spin size="large" />
-      </div>
-    );
-  }
+  //
 
   return (
     <div className="">
@@ -736,6 +754,7 @@ const OrderEntry = () => {
           />
         </Card>
 
+        {/* Rest of your modals remain the same */}
         {/* Add Order Modal */}
         <Modal
           title="নতুন অর্ডার যোগ করুন"
