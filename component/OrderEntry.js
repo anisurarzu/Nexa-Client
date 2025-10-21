@@ -670,59 +670,58 @@ const OrderEntry = () => {
 
       <div className=" ">
         {/* Financial Summary Dashboard */}
-        {financialSummary && (
-          <Card>
-            <Row gutter={16} className="">
-              <Col xs={24} sm={12} md={8} className="mb-3">
-                <Button
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  size="large"
-                  onClick={() => setAddOrderModalVisible(true)}
-                  className="w-full h-12 rounded-lg"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, #6ECB63 0%, #5B8FF9 100%)",
-                    border: "none",
-                    fontFamily: "Inter, sans-serif",
-                    fontWeight: 500,
-                  }}
-                >
-                  নতুন অর্ডার
-                </Button>
-              </Col>
-              <Col xs={24} sm={12} md={8} className="mb-3">
-                <Button
-                  icon={<QrcodeOutlined />}
-                  size="large"
-                  onClick={startQRScanner}
-                  className="w-full h-12 rounded-lg border-0"
-                  style={{
-                    background: "rgba(255, 255, 255, 0.9)",
-                    boxShadow: "0 4px 15px rgba(0, 0, 0, 0.1)",
-                    fontFamily: "Inter, sans-serif",
-                    fontWeight: 500,
-                  }}
-                >
-                  QR স্ক্যান করুন
-                </Button>
-              </Col>
-            </Row>
-          </Card>
-        )}
+
+        <Card>
+          <Row gutter={16} className="">
+            <Col xs={24} sm={12} md={8} className="mb-3">
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                size="large"
+                onClick={() => setAddOrderModalVisible(true)}
+                className="w-full h-12 rounded-lg"
+                style={{
+                  background:
+                    "linear-gradient(135deg, #6ECB63 0%, #5B8FF9 100%)",
+                  border: "none",
+                  fontFamily: "Inter, sans-serif",
+                  fontWeight: 500,
+                }}
+              >
+                নতুন অর্ডার
+              </Button>
+            </Col>
+            <Col xs={24} sm={12} md={8} className="mb-3">
+              <Button
+                icon={<QrcodeOutlined />}
+                size="large"
+                onClick={startQRScanner}
+                className="w-full h-12 rounded-lg border-0"
+                style={{
+                  background: "rgba(255, 255, 255, 0.9)",
+                  boxShadow: "0 4px 15px rgba(0, 0, 0, 0.1)",
+                  fontFamily: "Inter, sans-serif",
+                  fontWeight: 500,
+                }}
+              >
+                QR স্ক্যান করুন
+              </Button>
+            </Col>
+          </Row>
+        </Card>
 
         {/* Main Order Card */}
 
         {/* All Orders Table */}
         <Card
           className="rounded-xl border-0"
-          // style={{
-          //   background: "rgba(255, 255, 255, 0.95)",
-          //   boxShadow: "0 8px 32px rgba(31, 38, 135, 0.1)",
-          //   backdropFilter: "blur(4px)",
-          // }}
+          style={{
+            background: "rgba(255, 255, 255, 0.95)",
+            boxShadow: "0 8px 32px rgba(31, 38, 135, 0.1)",
+            backdropFilter: "blur(4px)",
+          }}
         >
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+          <div className="mb-2">
             <Title
               level={4}
               className="m-0"
