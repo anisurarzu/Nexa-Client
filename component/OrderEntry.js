@@ -654,20 +654,6 @@ const OrderEntry = () => {
 
   return (
     <div className="">
-      {/* Gradient Header with Waves */}
-      <div className="absolute top-0 left-0 right-0 h-64 bg-gradient-to-r from-[#6ECB63] to-[#5B8FF9] overflow-hidden z-0">
-        <svg
-          className="absolute bottom-0 left-0 right-0"
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 1440 320"
-        >
-          <path
-            fill="rgba(255, 255, 255, 0.3)"
-            d="M0,256L48,261.3C96,267,192,277,288,250.7C384,224,480,160,576,160C672,160,768,224,864,218.7C960,213,1056,139,1152,117.3C1248,96,1344,128,1392,144L1440,160L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"
-          ></path>
-        </svg>
-      </div>
-
       <div className=" ">
         {/* Financial Summary Dashboard */}
 
