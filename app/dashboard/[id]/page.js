@@ -481,7 +481,7 @@ const Invoice = ({ params }) => {
           </div>
 
           {/* Print Styles */}
-          <style jsx global>{`
+          {/* <style jsx global>{`
             @media print {
               body {
                 padding: 0 !important;
@@ -516,7 +516,7 @@ const Invoice = ({ params }) => {
                 print-color-adjust: exact !important;
               }
             }
-          `}</style>
+          `}</style> */}
         </div>
       )}
     </Watermark>
