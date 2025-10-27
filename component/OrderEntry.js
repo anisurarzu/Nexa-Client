@@ -78,6 +78,7 @@ const OrderEntry = () => {
   const [orderSubmitting, setOrderSubmitting] = useState(false);
   const [orders, setOrders] = useState([]);
   const [financialSummary, setFinancialSummary] = useState(null);
+  const [currentUser, setCurrentUser] = useState("");
 
   // Modal states
   const [addOrderModalVisible, setAddOrderModalVisible] = useState(false);
@@ -99,11 +100,27 @@ const OrderEntry = () => {
     address: "",
   });
 
-  // Fetch initial data
+  // Fetch current user from localStorage
   useEffect(() => {
     loadFonts();
+    fetchCurrentUser();
     fetchInitialData();
   }, []);
+
+  const fetchCurrentUser = () => {
+    try {
+      const userInfo = localStorage.getItem("userInfo");
+      if (userInfo) {
+        const userData = JSON.parse(userInfo);
+        setCurrentUser(userData.username || userData.name || "user");
+      } else {
+        setCurrentUser("user");
+      }
+    } catch (error) {
+      console.error("Error fetching user info:", error);
+      setCurrentUser("user");
+    }
+  };
 
   const fetchInitialData = async () => {
     setLoading(true);
@@ -314,7 +331,7 @@ const OrderEntry = () => {
       totalAmount: total,
       grandTotal: total,
       paymentMethod: "Cash",
-      createdBy: "user",
+      createdBy: currentUser, // localStorage থেকে username ব্যবহার করা হচ্ছে
       status: "Pending", // Default status
     };
 
@@ -335,6 +352,10 @@ const OrderEntry = () => {
               <br />
               <Text type="secondary" style={{ fontSize: "12px" }}>
                 অর্ডার নম্বর: {response.data.data.orderNo}
+              </Text>
+              <br />
+              <Text type="secondary" style={{ fontSize: "12px" }}>
+                তৈরি করেছেন: {currentUser}
               </Text>
             </div>
           ),
@@ -385,11 +406,10 @@ const OrderEntry = () => {
       customerName: values.customerName || "Walk-in Customer",
       customerPhone: values.customerPhone || "N/A",
       customerAddress: values.customerAddress || "N/A",
-
       totalAmount: total,
       grandTotal: total,
       paymentMethod: "Cash",
-      createdBy: "user",
+      createdBy: currentUser, // localStorage থেকে username ব্যবহার করা হচ্ছে
       status: "Pending", // Default status
     };
 
@@ -410,6 +430,10 @@ const OrderEntry = () => {
               <br />
               <Text type="secondary" style={{ fontSize: "12px" }}>
                 অর্ডার নম্বর: {response.data.data.orderNo}
+              </Text>
+              <br />
+              <Text type="secondary" style={{ fontSize: "12px" }}>
+                তৈরি করেছেন: {currentUser}
               </Text>
             </div>
           ),
@@ -482,6 +506,7 @@ const OrderEntry = () => {
     try {
       const response = await coreAxios.put(`/productOrders/${orderId}`, {
         status: newStatus,
+        updatedBy: currentUser, // আপডেট করছেন কে তা যোগ করা
       });
       if (response.data.success) {
         message.success("অর্ডার স্ট্যাটাস সফলভাবে আপডেট হয়েছে!");
@@ -496,25 +521,44 @@ const OrderEntry = () => {
     }
   };
 
-  // Edit Order
+  // Edit Order - সম্পূর্ণ অর্ডার এডিট করার ফাংশন
   const editOrder = (order) => {
     setSelectedOrder(order);
     editOrderForm.setFieldsValue({
+      productName: order.productName,
+      productId: order.productId,
+      category: order.category,
+      unitPrice: order.unitPrice,
+      salePrice: order.salePrice,
+      quantity: order.quantity,
       customerName: order.customerName,
       customerPhone: order.customerPhone,
       customerAddress: order.customerAddress,
       status: order.status,
+      paymentMethod: order.paymentMethod,
     });
     setEditOrderModalVisible(true);
   };
 
-  // Update Order
+  // Update Order - সম্পূর্ণ অর্ডার আপডেট করার ফাংশন
   const updateOrder = async (values) => {
     try {
+      // Calculate new total
+      const total = values.salePrice * values.quantity;
+
+      const updateData = {
+        ...values,
+        total: total,
+        grandTotal: total,
+        totalAmount: total,
+        updatedBy: currentUser, // আপডেট করছেন কে তা যোগ করা
+      };
+
       const response = await coreAxios.put(
         `/productOrders/${selectedOrder._id}`,
-        values
+        updateData
       );
+
       if (response.data.success) {
         message.success("অর্ডার সফলভাবে আপডেট হয়েছে!");
         setEditOrderModalVisible(false);
@@ -573,6 +617,7 @@ const OrderEntry = () => {
   };
 
   // Order Table Columns
+  // Order Table Columns
   const orderColumns = [
     {
       title: "অর্ডার নম্বর",
@@ -584,9 +629,7 @@ const OrderEntry = () => {
       title: "পণ্যের নাম",
       dataIndex: "productName",
       key: "productName",
-      render: (text) => <Text strong>#{text}</Text>,
     },
-
     {
       title: "গ্রাহক",
       dataIndex: "customerName",
@@ -598,10 +641,28 @@ const OrderEntry = () => {
       key: "customerPhone",
     },
     {
+      title: "পরিমাণ",
+      dataIndex: "quantity",
+      key: "quantity",
+      render: (quantity) => <Text>{quantity} পিস</Text>,
+    },
+    {
+      title: "দাম",
+      dataIndex: "salePrice",
+      key: "salePrice",
+      render: (price) => <Text>৳{price}</Text>,
+    },
+    {
       title: "মোট",
       dataIndex: "grandTotal",
       key: "grandTotal",
       render: (amount) => <Text strong>৳{amount}</Text>,
+    },
+    {
+      title: "তৈরি করেছেন",
+      dataIndex: "createdBy",
+      key: "createdBy",
+      render: (createdBy) => <Tag color="blue">{createdBy}</Tag>,
     },
     {
       title: "স্ট্যাটাস",
@@ -634,6 +695,23 @@ const OrderEntry = () => {
       render: (date) => dayjs(date).format("DD/MM/YYYY HH:mm"),
     },
     {
+      title: "ইনভয়েস",
+      key: "invoice",
+      render: (_, record) => (
+        <Tooltip title="ইনভয়েস দেখুন">
+          <Button
+            type="link"
+            icon={<EyeOutlined />}
+            onClick={() => window.open(`/dashboard/${record._id}`, "_blank")}
+            size="small"
+            style={{ color: "#1890ff", padding: 0 }}
+          >
+            ইনভয়েস
+          </Button>
+        </Tooltip>
+      ),
+    },
+    {
       title: "কর্ম",
       key: "action",
       render: (_, record) => (
@@ -646,7 +724,7 @@ const OrderEntry = () => {
               size="small"
             />
           </Tooltip>
-          <Tooltip title="এডিট">
+          <Tooltip title="সম্পূর্ণ এডিট">
             <Button
               type="text"
               icon={<EditOutlined />}
@@ -667,8 +745,6 @@ const OrderEntry = () => {
       ),
     },
   ];
-
-  //
 
   return (
     <div className="">
@@ -711,10 +787,16 @@ const OrderEntry = () => {
                 QR স্ক্যান করুন
               </Button>
             </Col>
+            <Col xs={24} sm={24} md={8} className="mb-3">
+              <div className="text-right">
+                <Text type="secondary">লগ ইন ইউজার:</Text>
+                <Tag color="green" className="ml-2">
+                  {currentUser}
+                </Tag>
+              </div>
+            </Col>
           </Row>
         </Card>
-
-        {/* Main Order Card */}
 
         {/* All Orders Table */}
         <Card
@@ -746,7 +828,7 @@ const OrderEntry = () => {
             columns={orderColumns}
             dataSource={orders}
             loading={loading}
-            scroll={{ x: 800 }}
+            scroll={{ x: 1200 }}
             pagination={{ pageSize: 10 }}
             size="middle"
             className="rounded-lg"
@@ -754,7 +836,6 @@ const OrderEntry = () => {
           />
         </Card>
 
-        {/* Rest of your modals remain the same */}
         {/* Add Order Modal */}
         <Modal
           title="নতুন অর্ডার যোগ করুন"
@@ -770,7 +851,7 @@ const OrderEntry = () => {
             layout="vertical"
             className="mt-4"
             initialValues={{
-              quantity: 1, // Set default quantity to 1
+              quantity: 1,
             }}
           >
             {/* Customer Information in Modal - Not Required */}
@@ -908,6 +989,11 @@ const OrderEntry = () => {
             </Card>
 
             <div className="text-right pt-4 border-t">
+              <div className="mb-2">
+                <Text type="secondary">
+                  অর্ডার তৈরি করবেন: <Tag color="blue">{currentUser}</Tag>
+                </Text>
+              </div>
               <Button
                 onClick={() => setAddOrderModalVisible(false)}
                 className="mr-2 rounded-lg"
@@ -952,6 +1038,9 @@ const OrderEntry = () => {
                 </Descriptions.Item>
                 <Descriptions.Item label="ঠিকানা">
                   {selectedOrder.customerAddress}
+                </Descriptions.Item>
+                <Descriptions.Item label="তৈরি করেছেন">
+                  <Tag color="blue">{selectedOrder.createdBy}</Tag>
                 </Descriptions.Item>
                 <Descriptions.Item label="স্ট্যাটাস">
                   <Tag
@@ -1001,7 +1090,7 @@ const OrderEntry = () => {
                     render: (total) => `৳${total}`,
                   },
                 ]}
-                dataSource={selectedOrder.items}
+                dataSource={[selectedOrder]} // Since it's single product order, wrap in array
                 pagination={false}
                 size="small"
                 rowKey="productId"
@@ -1010,13 +1099,13 @@ const OrderEntry = () => {
           )}
         </Modal>
 
-        {/* Edit Order Modal */}
+        {/* সম্পূর্ণ অর্ডার এডিট করার Modal */}
         <Modal
-          title="অর্ডার এডিট করুন"
+          title="অর্ডার সম্পূর্ণ এডিট করুন"
           open={editOrderModalVisible}
           onCancel={() => setEditOrderModalVisible(false)}
           footer={null}
-          width={500}
+          width={700}
           className="rounded-lg"
         >
           <Form
@@ -1025,24 +1114,122 @@ const OrderEntry = () => {
             layout="vertical"
             className="mt-4"
           >
-            <Form.Item name="customerName" label="গ্রাহকের নাম">
-              <Input size="large" />
-            </Form.Item>
-            <Form.Item name="customerPhone" label="ফোন নম্বর">
-              <Input size="large" />
-            </Form.Item>
-            <Form.Item name="customerAddress" label="ঠিকানা">
-              <Input.TextArea rows={3} />
-            </Form.Item>
-            <Form.Item name="status" label="স্ট্যাটাস">
-              <Select size="large">
-                <Option value="Pending">Pending</Option>
-                <Option value="Processing">Processing</Option>
-                <Option value="Completed">Completed</Option>
-                <Option value="Cancelled">Cancelled</Option>
-              </Select>
-            </Form.Item>
-            <div className="text-right pt-4 border-t">
+            <Card title="গ্রাহকের তথ্য" size="small" className="mb-4">
+              <Row gutter={16}>
+                <Col xs={24} md={8}>
+                  <Form.Item name="customerName" label="গ্রাহকের নাম">
+                    <Input
+                      prefix={<UserOutlined />}
+                      placeholder="গ্রাহকের নাম"
+                      size="large"
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={8}>
+                  <Form.Item name="customerPhone" label="ফোন নম্বর">
+                    <Input
+                      prefix={<PhoneOutlined />}
+                      placeholder="ফোন নম্বর"
+                      size="large"
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={8}>
+                  <Form.Item name="customerAddress" label="ঠিকানা">
+                    <Input
+                      prefix={<HomeOutlined />}
+                      placeholder="ঠিকানা"
+                      size="large"
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </Card>
+
+            <Card title="পণ্যের তথ্য" size="small" className="mb-4">
+              <Row gutter={16}>
+                <Col xs={24} md={12}>
+                  <Form.Item name="productName" label="পণ্যের নাম">
+                    <Input size="large" readOnly />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item name="category" label="ক্যাটাগরি">
+                    <Input size="large" readOnly />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Row gutter={16}>
+                <Col xs={24} md={8}>
+                  <Form.Item name="unitPrice" label="ইউনিট প্রাইস">
+                    <InputNumber
+                      className="w-full"
+                      min={1}
+                      formatter={(value) => `৳ ${value}`}
+                      parser={(value) => value.replace(/৳\s?/g, "")}
+                      size="large"
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={8}>
+                  <Form.Item
+                    name="salePrice"
+                    label="সেল প্রাইস"
+                    rules={[{ required: true, message: "সেল প্রাইস লিখুন" }]}
+                  >
+                    <InputNumber
+                      className="w-full"
+                      min={1}
+                      formatter={(value) => `৳ ${value}`}
+                      parser={(value) => value.replace(/৳\s?/g, "")}
+                      size="large"
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={8}>
+                  <Form.Item
+                    name="quantity"
+                    label="পরিমাণ"
+                    rules={[{ required: true, message: "পরিমাণ লিখুন" }]}
+                  >
+                    <InputNumber className="w-full" min={1} size="large" />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </Card>
+
+            <Card title="অর্ডার সেটিংস" size="small">
+              <Row gutter={16}>
+                <Col xs={24} md={12}>
+                  <Form.Item name="status" label="স্ট্যাটাস">
+                    <Select size="large">
+                      <Option value="Pending">Pending</Option>
+                      <Option value="Processing">Processing</Option>
+                      <Option value="Completed">Completed</Option>
+                      <Option value="Cancelled">Cancelled</Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item name="paymentMethod" label="পেমেন্ট মেথড">
+                    <Select size="large">
+                      <Option value="Cash">Cash</Option>
+                      <Option value="Card">Card</Option>
+                      <Option value="Mobile Banking">Mobile Banking</Option>
+                      <Option value="Bank Transfer">Bank Transfer</Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
+              </Row>
+            </Card>
+
+            <div className="text-right pt-4 border-t mt-4">
+              <div className="mb-2">
+                <Text type="secondary">
+                  আপডেট করবেন: <Tag color="orange">{currentUser}</Tag>
+                </Text>
+              </div>
               <Button
                 onClick={() => setEditOrderModalVisible(false)}
                 className="mr-2 rounded-lg"
@@ -1207,6 +1394,11 @@ const OrderEntry = () => {
               </Card>
 
               <div className="text-right pt-4 border-t">
+                <div className="mb-2">
+                  <Text type="secondary">
+                    অর্ডার তৈরি করবেন: <Tag color="blue">{currentUser}</Tag>
+                  </Text>
+                </div>
                 <Button
                   onClick={() => {
                     setScanModalVisible(false);
