@@ -892,6 +892,12 @@ const OrderEntry = () => {
                       placeholder="ক্যাটাগরি নির্বাচন করুন"
                       onChange={fetchProductsByCategory}
                       size="large"
+                      showSearch
+                      filterOption={(input, option) =>
+                        String(option?.children || "")
+                          .toLowerCase()
+                          .includes(input.toLowerCase())
+                      }
                     >
                       {categories.map((category) => (
                         <Option
@@ -915,11 +921,19 @@ const OrderEntry = () => {
                       size="large"
                       showSearch
                       onChange={handleProductSelect}
-                      filterOption={(input, option) =>
-                        option.children
+                      filterOption={(input, option) => {
+                        // Safely handle option.children which might be undefined or not a string
+                        const children = option?.children;
+                        if (typeof children === "string") {
+                          return children
+                            .toLowerCase()
+                            .includes(input.toLowerCase());
+                        }
+                        // If children is not a string (React element, etc.), convert to string
+                        return String(children || "")
                           .toLowerCase()
-                          .includes(input.toLowerCase())
-                      }
+                          .includes(input.toLowerCase());
+                      }}
                     >
                       {products.map((product) => (
                         <Option
