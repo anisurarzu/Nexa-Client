@@ -37,16 +37,35 @@ import coreAxios from "@/utils/axiosInstance";
 
 const { Text } = Typography;
 
-// Color schemes for different cards
-const cardGradients = {
-  green: "linear-gradient(135deg, #48bb78 0%, #38a169 100%)",
-  gold: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-  blue: "linear-gradient(135deg, #4299e1 0%, #3182ce 100%)",
-  purple: "linear-gradient(135deg, #a78bfa 0%, #7dd3fc 100%)",
-  orange: "linear-gradient(135deg, #fdba74 0%, #fb923c 100%)",
-  teal: "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)",
-  pink: "linear-gradient(135deg, #ec4899 0%, #f472b6 100%)",
+// Solid color schemes for different cards
+const cardColors = {
+  green: "#10b981", // Emerald
+  gold: "#f59e0b", // Amber
+  blue: "#3b82f6", // Blue
+  purple: "#8b5cf6", // Violet
+  orange: "#f97316", // Orange
+  teal: "#14b8a6", // Teal
+  pink: "#ec4899", // Pink
+  indigo: "#6366f1", // Indigo
+  cyan: "#06b6d4", // Cyan
+  lime: "#84cc16", // Lime
+  rose: "#f43f5e", // Rose
+  sky: "#0ea5e9", // Sky
 };
+
+// Solid background colors for category cards
+const categoryColors = [
+  "#3b82f6", // Blue
+  "#8b5cf6", // Purple
+  "#ec4899", // Pink
+  "#f59e0b", // Amber
+  "#10b981", // Emerald
+  "#f97316", // Orange
+  "#06b6d4", // Cyan
+  "#84cc16", // Lime
+  "#f43f5e", // Rose
+  "#6366f1", // Indigo
+];
 
 const DashboardHome = () => {
   const [dashboardData, setDashboardData] = useState({
@@ -336,7 +355,7 @@ const DashboardHome = () => {
           <Card
             className="border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:-translate-y-1"
             bodyStyle={{
-              background: cardGradients.green,
+              background: cardColors.green,
               borderRadius: "12px",
               padding: "24px",
               color: "white",
@@ -371,7 +390,7 @@ const DashboardHome = () => {
           <Card
             className="border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:-translate-y-1"
             bodyStyle={{
-              background: cardGradients.gold,
+              background: cardColors.gold,
               borderRadius: "12px",
               padding: "24px",
               color: "white",
@@ -406,7 +425,7 @@ const DashboardHome = () => {
           <Card
             className="border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:-translate-y-1"
             bodyStyle={{
-              background: cardGradients.blue,
+              background: cardColors.blue,
               borderRadius: "12px",
               padding: "24px",
               color: "white",
@@ -443,7 +462,7 @@ const DashboardHome = () => {
           <Card
             className="border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:-translate-y-1"
             bodyStyle={{
-              background: cardGradients.purple,
+              background: cardColors.purple,
               borderRadius: "12px",
               padding: "24px",
               color: "white",
@@ -489,7 +508,7 @@ const DashboardHome = () => {
           <Card
             className="border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:-translate-y-1"
             bodyStyle={{
-              background: cardGradients.teal,
+              background: cardColors.teal,
               borderRadius: "12px",
               padding: "24px",
               color: "white",
@@ -524,7 +543,7 @@ const DashboardHome = () => {
           <Card
             className="border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:-translate-y-1"
             bodyStyle={{
-              background: cardGradients.pink,
+              background: cardColors.pink,
               borderRadius: "12px",
               padding: "24px",
               color: "white",
@@ -559,7 +578,7 @@ const DashboardHome = () => {
           <Card
             className="border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:-translate-y-1"
             bodyStyle={{
-              background: cardGradients.orange,
+              background: cardColors.orange,
               borderRadius: "12px",
               padding: "24px",
               color: "white",
@@ -821,7 +840,11 @@ const DashboardHome = () => {
               {dashboardData.inventoryStats.map((category, index) => (
                 <div
                   key={index}
-                  className="bg-gradient-to-r from-blue-500 to-purple-500 text-white p-4 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105"
+                  style={{
+                    backgroundColor:
+                      categoryColors[index % categoryColors.length],
+                  }}
+                  className="text-white p-4 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105"
                 >
                   <div className="flex justify-between items-center">
                     <div>
@@ -876,59 +899,57 @@ const DashboardHome = () => {
               dataSource={dashboardData.recentOrdersWithProfit}
               renderItem={(item, index) => (
                 <List.Item className="border-0 !px-0 !py-3">
-                  <List.Item.Meta
-                    avatar={
+                  <div className="flex items-start w-full">
+                    <div className="mr-3 mt-1">
                       <ShoppingCartOutlined className="text-green-600 text-lg" />
-                    }
-                    title={
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-800">{item.item}</span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-gray-800 font-medium">
+                          {item.item}
+                        </span>
                         <span className="text-green-600 font-semibold">
                           {item.total?.toLocaleString()} ৳
                         </span>
                       </div>
-                    }
-                    description={
-                      <div>
-                        <div className="text-gray-600">
-                          তারিখ: {item.date} | পরিমাণ: {item.quantity} pcs
+                      <div className="text-gray-600 text-sm mb-2">
+                        তারিখ: {item.date} | পরিমাণ: {item.quantity} pcs
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <Tag
+                            color={
+                              item.status === "Delivered" ||
+                              item.status === "Completed"
+                                ? "green"
+                                : item.status === "Pending"
+                                ? "orange"
+                                : item.status === "Cancelled"
+                                ? "red"
+                                : "blue"
+                            }
+                            className="border-0 text-white"
+                          >
+                            {item.status}
+                          </Tag>
                         </div>
-                        <div className="flex justify-between items-center mt-1">
-                          <div>
-                            <Tag
-                              color={
-                                item.status === "Delivered" ||
-                                item.status === "Completed"
-                                  ? "green"
-                                  : item.status === "Pending"
-                                  ? "orange"
-                                  : item.status === "Cancelled"
-                                  ? "red"
-                                  : "blue"
-                              }
-                              className="border-0 text-white"
-                            >
-                              {item.status}
-                            </Tag>
+                        <div className="text-right">
+                          <div
+                            className={`text-sm font-semibold ${
+                              item.profit >= 0
+                                ? "text-green-600"
+                                : "text-red-600"
+                            }`}
+                          >
+                            লাভ: {item.profit?.toLocaleString()} ৳
                           </div>
-                          <div className="text-right">
-                            <div
-                              className={`text-sm font-semibold ${
-                                item.profit >= 0
-                                  ? "text-green-600"
-                                  : "text-red-600"
-                              }`}
-                            >
-                              লাভ: {item.profit?.toLocaleString()} ৳
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              ক্রয়: {item.unitPrice?.toLocaleString()} ৳/unit
-                            </div>
+                          <div className="text-xs text-gray-500">
+                            ক্রয়: {item.unitPrice?.toLocaleString()} ৳/unit
                           </div>
                         </div>
                       </div>
-                    }
-                  />
+                    </div>
+                  </div>
                 </List.Item>
               )}
               locale={{ emptyText: "কোন সাম্প্রতিক অর্ডার নেই" }}

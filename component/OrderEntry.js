@@ -20,6 +20,7 @@ import {
   Statistic,
   Spin,
   Divider,
+  DatePicker,
 } from "antd";
 import {
   QrcodeOutlined,
@@ -42,6 +43,7 @@ import {
   DollarOutlined,
   ArrowUpOutlined,
   ArrowDownOutlined,
+  CalendarOutlined,
 } from "@ant-design/icons";
 import { Html5Qrcode } from "html5-qrcode";
 import coreAxios from "@/utils/axiosInstance";
@@ -285,6 +287,7 @@ const OrderEntry = () => {
           salePrice: productData.unitPrice,
           quantity: 1,
           availableQuantity: productData.quantity || 100, // Default to 100 if not available
+          orderDate: dayjs(), // Set current date as default
         });
 
         message.success("পণ্য সফলভাবে স্ক্যান করা হয়েছে!");
@@ -333,6 +336,9 @@ const OrderEntry = () => {
       paymentMethod: "Cash",
       createdBy: currentUser, // localStorage থেকে username ব্যবহার করা হচ্ছে
       status: "Pending", // Default status
+      orderDate: values.orderDate
+        ? values.orderDate.toISOString()
+        : new Date().toISOString(), // Add order date
     };
 
     console.log("Order Data to be sent:", orderData);
@@ -356,6 +362,10 @@ const OrderEntry = () => {
               <br />
               <Text type="secondary" style={{ fontSize: "12px" }}>
                 তৈরি করেছেন: {currentUser}
+              </Text>
+              <br />
+              <Text type="secondary" style={{ fontSize: "12px" }}>
+                অর্ডার তারিখ: {dayjs(orderData.orderDate).format("DD/MM/YYYY")}
               </Text>
             </div>
           ),
@@ -411,6 +421,9 @@ const OrderEntry = () => {
       paymentMethod: "Cash",
       createdBy: currentUser, // localStorage থেকে username ব্যবহার করা হচ্ছে
       status: "Pending", // Default status
+      orderDate: values.orderDate
+        ? values.orderDate.toISOString()
+        : new Date().toISOString(), // Add order date
     };
 
     console.log("Order Data to be sent:", orderData);
@@ -434,6 +447,10 @@ const OrderEntry = () => {
               <br />
               <Text type="secondary" style={{ fontSize: "12px" }}>
                 তৈরি করেছেন: {currentUser}
+              </Text>
+              <br />
+              <Text type="secondary" style={{ fontSize: "12px" }}>
+                অর্ডার তারিখ: {dayjs(orderData.orderDate).format("DD/MM/YYYY")}
               </Text>
             </div>
           ),
@@ -473,6 +490,7 @@ const OrderEntry = () => {
         salePrice: selectedProduct.unitPrice,
         quantity: 1, // Set default quantity to 1
         availableQuantity: selectedProduct.quantity || 100, // Set available quantity
+        orderDate: dayjs(), // Set current date as default
       });
     }
   };
@@ -536,6 +554,7 @@ const OrderEntry = () => {
       customerAddress: order.customerAddress,
       status: order.status,
       paymentMethod: order.paymentMethod,
+      orderDate: order.orderDate ? dayjs(order.orderDate) : dayjs(), // Set order date
     });
     setEditOrderModalVisible(true);
   };
@@ -552,6 +571,9 @@ const OrderEntry = () => {
         grandTotal: total,
         totalAmount: total,
         updatedBy: currentUser, // আপডেট করছেন কে তা যোগ করা
+        orderDate: values.orderDate
+          ? values.orderDate.toISOString()
+          : new Date().toISOString(), // Add order date
       };
 
       const response = await coreAxios.put(
@@ -617,7 +639,6 @@ const OrderEntry = () => {
   };
 
   // Order Table Columns
-  // Order Table Columns
   const orderColumns = [
     {
       title: "অর্ডার নম্বর",
@@ -659,6 +680,12 @@ const OrderEntry = () => {
       render: (amount) => <Text strong>৳{amount}</Text>,
     },
     {
+      title: "অর্ডার তারিখ",
+      dataIndex: "orderDate",
+      key: "orderDate",
+      render: (date) => dayjs(date).format("DD/MM/YYYY HH:mm"),
+    },
+    {
       title: "তৈরি করেছেন",
       dataIndex: "createdBy",
       key: "createdBy",
@@ -687,12 +714,6 @@ const OrderEntry = () => {
           </Tag>
         </Tooltip>
       ),
-    },
-    {
-      title: "তারিখ",
-      dataIndex: "orderDate",
-      key: "orderDate",
-      render: (date) => dayjs(date).format("DD/MM/YYYY HH:mm"),
     },
     {
       title: "ইনভয়েস",
@@ -852,6 +873,7 @@ const OrderEntry = () => {
             className="mt-4"
             initialValues={{
               quantity: 1,
+              orderDate: dayjs(), // Set current date as default
             }}
           >
             {/* Customer Information in Modal - Not Required */}
@@ -997,6 +1019,28 @@ const OrderEntry = () => {
                   </Form.Item>
                 </Col>
               </Row>
+
+              {/* Order Date Field */}
+              <Row gutter={16}>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name="orderDate"
+                    label="অর্ডার তারিখ"
+                    rules={[
+                      { required: true, message: "অর্ডার তারিখ নির্বাচন করুন" },
+                    ]}
+                  >
+                    <DatePicker
+                      className="w-full"
+                      size="large"
+                      format="DD/MM/YYYY"
+                      placeholder="অর্ডার তারিখ নির্বাচন করুন"
+                      suffixIcon={<CalendarOutlined />}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+
               <Form.Item name="availableQuantity" hidden>
                 <Input />
               </Form.Item>
@@ -1053,6 +1097,9 @@ const OrderEntry = () => {
                 <Descriptions.Item label="ঠিকানা">
                   {selectedOrder.customerAddress}
                 </Descriptions.Item>
+                <Descriptions.Item label="অর্ডার তারিখ">
+                  {dayjs(selectedOrder.orderDate).format("DD/MM/YYYY HH:mm")}
+                </Descriptions.Item>
                 <Descriptions.Item label="তৈরি করেছেন">
                   <Tag color="blue">{selectedOrder.createdBy}</Tag>
                 </Descriptions.Item>
@@ -1076,9 +1123,6 @@ const OrderEntry = () => {
                 </Descriptions.Item>
                 <Descriptions.Item label="পেমেন্ট মেথড">
                   {selectedOrder.paymentMethod}
-                </Descriptions.Item>
-                <Descriptions.Item label="অর্ডার তারিখ">
-                  {dayjs(selectedOrder.orderDate).format("DD/MM/YYYY HH:mm")}
                 </Descriptions.Item>
               </Descriptions>
 
@@ -1211,6 +1255,27 @@ const OrderEntry = () => {
                   </Form.Item>
                 </Col>
               </Row>
+
+              {/* Order Date Field in Edit Modal */}
+              <Row gutter={16}>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name="orderDate"
+                    label="অর্ডার তারিখ"
+                    rules={[
+                      { required: true, message: "অর্ডার তারিখ নির্বাচন করুন" },
+                    ]}
+                  >
+                    <DatePicker
+                      className="w-full"
+                      size="large"
+                      format="DD/MM/YYYY"
+                      placeholder="অর্ডার তারিখ নির্বাচন করুন"
+                      suffixIcon={<CalendarOutlined />}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
             </Card>
 
             <Card title="অর্ডার সেটিংস" size="small">
@@ -1307,6 +1372,7 @@ const OrderEntry = () => {
               layout="vertical"
               initialValues={{
                 quantity: 1, // Set default quantity to 1
+                orderDate: dayjs(), // Set current date as default
               }}
             >
               {/* Customer Information in Scan Modal - Not Required */}
@@ -1402,6 +1468,31 @@ const OrderEntry = () => {
                     </Form.Item>
                   </Col>
                 </Row>
+
+                {/* Order Date Field in Scan Modal */}
+                <Row gutter={16}>
+                  <Col xs={24} md={12}>
+                    <Form.Item
+                      name="orderDate"
+                      label="অর্ডার তারিখ"
+                      rules={[
+                        {
+                          required: true,
+                          message: "অর্ডার তারিখ নির্বাচন করুন",
+                        },
+                      ]}
+                    >
+                      <DatePicker
+                        className="w-full"
+                        size="large"
+                        format="DD/MM/YYYY"
+                        placeholder="অর্ডার তারিখ নির্বাচন করুন"
+                        suffixIcon={<CalendarOutlined />}
+                      />
+                    </Form.Item>
+                  </Col>
+                </Row>
+
                 <Form.Item name="availableQuantity" hidden>
                   <Input />
                 </Form.Item>
