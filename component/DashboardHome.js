@@ -674,9 +674,9 @@ const DashboardHome = () => {
       {/* Header with Refresh Button */}
       <div className="flex justify-between items-center">
         <div>
-          <Text className="text-gray-600 text-lg">
+          {/* <Text className="text-gray-600 text-lg">
             সিস্টেমের সামগ্রিক পরিসংখ্যান এবং কার্যক্রম
-          </Text>
+          </Text> */}
         </div>
         <div className="flex gap-2">
           <Button
