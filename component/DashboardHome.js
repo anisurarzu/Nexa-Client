@@ -13,6 +13,9 @@ import {
   Button,
   Typography,
   Skeleton,
+  Modal,
+  Tabs,
+  Select,
 } from "antd";
 import {
   BoxPlotOutlined,
@@ -31,11 +34,29 @@ import {
   InfoCircleOutlined,
   RiseOutlined,
   FallOutlined,
+  LineChartOutlined,
+  AreaChartOutlined,
 } from "@ant-design/icons";
 import { useState, useEffect } from "react";
 import coreAxios from "@/utils/axiosInstance";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  Legend,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+} from "recharts";
 
 const { Text } = Typography;
+const { TabPane } = Tabs;
+const { Option } = Select;
 
 // Solid color schemes for different cards
 const cardColors = {
@@ -88,8 +109,18 @@ const DashboardHome = () => {
     monthlyProfit: 0,
     yearlyProfit: 0,
     recentOrdersWithProfit: [],
+    // Chart data
+    salesProfitData: {
+      daily: [],
+      monthly: [],
+      yearly: [],
+    },
   });
   const [loading, setLoading] = useState(true);
+  const [chartModalVisible, setChartModalVisible] = useState(false);
+  const [chartLoading, setChartLoading] = useState(false);
+  const [chartType, setChartType] = useState("line");
+  const [activeChartTab, setActiveChartTab] = useState("daily");
 
   // Function to calculate profit for an order
   const calculateOrderProfit = (order, products) => {
@@ -113,6 +144,108 @@ const DashboardHome = () => {
       expense: expense,
       unitPrice: unitPrice,
     };
+  };
+
+  // Generate sample chart data (in real app, this would come from API)
+  const generateChartData = (orders, products, period) => {
+    const data = [];
+    const now = new Date();
+
+    if (period === "daily") {
+      // Last 7 days
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date(now);
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toLocaleDateString("bn-BD", {
+          day: "numeric",
+          month: "short",
+        });
+
+        let dailySales = 0;
+        let dailyProfit = 0;
+
+        orders.forEach((order) => {
+          if (order.status === "Cancelled") return;
+
+          const orderDate = new Date(order.orderDate || order.createdAt);
+          if (orderDate.toDateString() === date.toDateString()) {
+            const profitData = calculateOrderProfit(order, products);
+            dailySales += profitData.revenue;
+            dailyProfit += profitData.profit;
+          }
+        });
+
+        data.push({
+          name: dateStr,
+          sales: dailySales,
+          profit: dailyProfit,
+          revenue: dailySales,
+        });
+      }
+    } else if (period === "monthly") {
+      // Last 6 months
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date(now);
+        date.setMonth(date.getMonth() - i);
+        const monthStr = date.toLocaleDateString("bn-BD", {
+          month: "short",
+          year: "numeric",
+        });
+
+        let monthlySales = 0;
+        let monthlyProfit = 0;
+
+        orders.forEach((order) => {
+          if (order.status === "Cancelled") return;
+
+          const orderDate = new Date(order.orderDate || order.createdAt);
+          if (
+            orderDate.getMonth() === date.getMonth() &&
+            orderDate.getFullYear() === date.getFullYear()
+          ) {
+            const profitData = calculateOrderProfit(order, products);
+            monthlySales += profitData.revenue;
+            monthlyProfit += profitData.profit;
+          }
+        });
+
+        data.push({
+          name: monthStr,
+          sales: monthlySales,
+          profit: monthlyProfit,
+          revenue: monthlySales,
+        });
+      }
+    } else if (period === "yearly") {
+      // Last 5 years
+      for (let i = 4; i >= 0; i--) {
+        const year = now.getFullYear() - i;
+        const yearStr = year.toString();
+
+        let yearlySales = 0;
+        let yearlyProfit = 0;
+
+        orders.forEach((order) => {
+          if (order.status === "Cancelled") return;
+
+          const orderDate = new Date(order.orderDate || order.createdAt);
+          if (orderDate.getFullYear() === year) {
+            const profitData = calculateOrderProfit(order, products);
+            yearlySales += profitData.revenue;
+            yearlyProfit += profitData.profit;
+          }
+        });
+
+        data.push({
+          name: yearStr,
+          sales: yearlySales,
+          profit: yearlyProfit,
+          revenue: yearlySales,
+        });
+      }
+    }
+
+    return data;
   };
 
   // Fetch dashboard data
@@ -276,6 +409,13 @@ const DashboardHome = () => {
         }))
         .slice(0, 6);
 
+      // Generate chart data
+      const salesProfitData = {
+        daily: generateChartData(orders, products, "daily"),
+        monthly: generateChartData(orders, products, "monthly"),
+        yearly: generateChartData(orders, products, "yearly"),
+      };
+
       setDashboardData({
         totalProducts,
         totalStockQuantity,
@@ -296,6 +436,8 @@ const DashboardHome = () => {
         monthlyProfit,
         yearlyProfit,
         recentOrdersWithProfit,
+        // Chart data
+        salesProfitData,
       });
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
@@ -312,6 +454,202 @@ const DashboardHome = () => {
   const refreshData = () => {
     fetchDashboardData();
     message.success("ডেটা রিফ্রেশ করা হয়েছে!");
+  };
+
+  const showChartModal = () => {
+    setChartModalVisible(true);
+  };
+
+  const handleChartModalCancel = () => {
+    setChartModalVisible(false);
+  };
+
+  // Render chart based on type and period
+  const renderChart = (data, period) => {
+    if (!data || data.length === 0) {
+      return (
+        <div className="text-center py-8 text-gray-500">
+          এই সময়ের জন্য কোন ডেটা পাওয়া যায়নি
+        </div>
+      );
+    }
+
+    const chartHeight = 400;
+
+    if (chartType === "line") {
+      return (
+        <ResponsiveContainer width="100%" height={chartHeight}>
+          <LineChart
+            data={data}
+            margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis
+              dataKey="name"
+              tick={{ fill: "#666" }}
+              axisLine={{ stroke: "#ddd" }}
+            />
+            <YAxis
+              tick={{ fill: "#666" }}
+              axisLine={{ stroke: "#ddd" }}
+              tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
+            />
+            <RechartsTooltip
+              formatter={(value, name) => [
+                `${parseFloat(value).toLocaleString()} ৳`,
+                name === "sales"
+                  ? "বিক্রয়"
+                  : name === "profit"
+                  ? "লাভ"
+                  : "রাজস্ব",
+              ]}
+              labelFormatter={(label) => `সময়: ${label}`}
+            />
+            <Legend
+              formatter={(value) =>
+                value === "sales"
+                  ? "বিক্রয়"
+                  : value === "profit"
+                  ? "লাভ"
+                  : "রাজস্ব"
+              }
+            />
+            <Line
+              type="monotone"
+              dataKey="sales"
+              stroke="#3b82f6"
+              strokeWidth={3}
+              dot={{ fill: "#3b82f6", strokeWidth: 2, r: 4 }}
+              activeDot={{ r: 6, stroke: "#3b82f6", strokeWidth: 2 }}
+              name="sales"
+            />
+            <Line
+              type="monotone"
+              dataKey="profit"
+              stroke="#10b981"
+              strokeWidth={3}
+              dot={{ fill: "#10b981", strokeWidth: 2, r: 4 }}
+              activeDot={{ r: 6, stroke: "#10b981", strokeWidth: 2 }}
+              name="profit"
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      );
+    } else if (chartType === "area") {
+      return (
+        <ResponsiveContainer width="100%" height={chartHeight}>
+          <AreaChart
+            data={data}
+            margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis
+              dataKey="name"
+              tick={{ fill: "#666" }}
+              axisLine={{ stroke: "#ddd" }}
+            />
+            <YAxis
+              tick={{ fill: "#666" }}
+              axisLine={{ stroke: "#ddd" }}
+              tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
+            />
+            <RechartsTooltip
+              formatter={(value, name) => [
+                `${parseFloat(value).toLocaleString()} ৳`,
+                name === "sales"
+                  ? "বিক্রয়"
+                  : name === "profit"
+                  ? "লাভ"
+                  : "রাজস্ব",
+              ]}
+              labelFormatter={(label) => `সময়: ${label}`}
+            />
+            <Legend
+              formatter={(value) =>
+                value === "sales"
+                  ? "বিক্রয়"
+                  : value === "profit"
+                  ? "লাভ"
+                  : "রাজস্ব"
+              }
+            />
+            <Area
+              type="monotone"
+              dataKey="sales"
+              stackId="1"
+              stroke="#3b82f6"
+              fill="#3b82f6"
+              fillOpacity={0.6}
+              strokeWidth={2}
+              name="sales"
+            />
+            <Area
+              type="monotone"
+              dataKey="profit"
+              stackId="2"
+              stroke="#10b981"
+              fill="#10b981"
+              fillOpacity={0.6}
+              strokeWidth={2}
+              name="profit"
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      );
+    } else if (chartType === "bar") {
+      return (
+        <ResponsiveContainer width="100%" height={chartHeight}>
+          <BarChart
+            data={data}
+            margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis
+              dataKey="name"
+              tick={{ fill: "#666" }}
+              axisLine={{ stroke: "#ddd" }}
+            />
+            <YAxis
+              tick={{ fill: "#666" }}
+              axisLine={{ stroke: "#ddd" }}
+              tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
+            />
+            <RechartsTooltip
+              formatter={(value, name) => [
+                `${parseFloat(value).toLocaleString()} ৳`,
+                name === "sales"
+                  ? "বিক্রয়"
+                  : name === "profit"
+                  ? "লাভ"
+                  : "রাজস্ব",
+              ]}
+              labelFormatter={(label) => `সময়: ${label}`}
+            />
+            <Legend
+              formatter={(value) =>
+                value === "sales"
+                  ? "বিক্রয়"
+                  : value === "profit"
+                  ? "লাভ"
+                  : "রাজস্ব"
+              }
+            />
+            <Bar
+              dataKey="sales"
+              fill="#3b82f6"
+              name="sales"
+              radius={[4, 4, 0, 0]}
+            />
+            <Bar
+              dataKey="profit"
+              fill="#10b981"
+              name="profit"
+              radius={[4, 4, 0, 0]}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      );
+    }
   };
 
   if (loading) {
@@ -340,13 +678,22 @@ const DashboardHome = () => {
             সিস্টেমের সামগ্রিক পরিসংখ্যান এবং কার্যক্রম
           </Text>
         </div>
-        <Button
-          icon={<ReloadOutlined />}
-          onClick={refreshData}
-          className="flex items-center bg-gradient-to-r from-green-500 to-blue-500 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 h-10 px-6"
-        >
-          রিফ্রেশ ডেটা
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            icon={<LineChartOutlined />}
+            onClick={showChartModal}
+            className="flex items-center bg-gradient-to-r from-purple-500 to-pink-500 text-black border-0 shadow-lg hover:shadow-xl transition-all duration-300 h-10 px-6"
+          >
+            বিক্রয় ও লাভ চার্ট
+          </Button>
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={refreshData}
+            className="flex items-center bg-gradient-to-r from-green-500 to-blue-500 text-black border-0 shadow-lg hover:shadow-xl transition-all duration-300 h-10 px-6"
+          >
+            রিফ্রেশ ডেটা
+          </Button>
+        </div>
       </div>
 
       {/* Main Metrics */}
@@ -1009,6 +1356,160 @@ const DashboardHome = () => {
           </Card>
         </Col>
       </Row>
+
+      {/* Chart Modal */}
+      <Modal
+        title={
+          <div className="flex items-center">
+            <LineChartOutlined className="text-purple-600 mr-2" />
+            <span className="text-xl font-bold">বিক্রয় ও লাভ বিশ্লেষণ</span>
+          </div>
+        }
+        open={chartModalVisible}
+        onCancel={handleChartModalCancel}
+        footer={null}
+        width="90%"
+        style={{ maxWidth: 1200 }}
+        bodyStyle={{ padding: "20px" }}
+      >
+        <div className="space-y-4">
+          {/* Chart Controls */}
+          <div className="flex flex-wrap gap-4 justify-between items-center p-4 bg-gray-50 rounded-lg">
+            <div className="flex items-center gap-4">
+              <span className="font-medium">চার্ট ধরন:</span>
+              <Select
+                value={chartType}
+                onChange={setChartType}
+                style={{ width: 120 }}
+              >
+                <Option value="line">লাইন চার্ট</Option>
+                <Option value="area">এরিয়া চার্ট</Option>
+                <Option value="bar">বার চার্ট</Option>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <span className="font-medium">সময়কাল:</span>
+              <Select
+                value={activeChartTab}
+                onChange={setActiveChartTab}
+                style={{ width: 120 }}
+              >
+                <Option value="daily">দৈনিক</Option>
+                <Option value="monthly">মাসিক</Option>
+                <Option value="yearly">বার্ষিক</Option>
+              </Select>
+            </div>
+          </div>
+
+          {/* Summary Cards */}
+          <Row gutter={[16, 16]}>
+            <Col xs={24} sm={8}>
+              <Card className="text-center border-0 shadow-md">
+                <div className="text-blue-600 font-bold text-2xl">
+                  {dashboardData.dailySales?.toLocaleString()} ৳
+                </div>
+                <div className="text-gray-600">দৈনিক বিক্রয়</div>
+              </Card>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Card className="text-center border-0 shadow-md">
+                <div className="text-green-600 font-bold text-2xl">
+                  {dashboardData.monthlySales?.toLocaleString()} ৳
+                </div>
+                <div className="text-gray-600">মাসিক বিক্রয়</div>
+              </Card>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Card className="text-center border-0 shadow-md">
+                <div className="text-purple-600 font-bold text-2xl">
+                  {dashboardData.yearlyProfit?.toLocaleString()} ৳
+                </div>
+                <div className="text-gray-600">বার্ষিক লাভ</div>
+              </Card>
+            </Col>
+          </Row>
+
+          {/* Chart Tabs */}
+          <Tabs
+            activeKey={activeChartTab}
+            onChange={setActiveChartTab}
+            type="card"
+            size="large"
+          >
+            <TabPane
+              tab={
+                <span>
+                  <RiseOutlined />
+                  দৈনিক বিশ্লেষণ
+                </span>
+              }
+              key="daily"
+            >
+              {renderChart(dashboardData.salesProfitData.daily, "daily")}
+            </TabPane>
+
+            <TabPane
+              tab={
+                <span>
+                  <BarChartOutlined />
+                  মাসিক বিশ্লেষণ
+                </span>
+              }
+              key="monthly"
+            >
+              {renderChart(dashboardData.salesProfitData.monthly, "monthly")}
+            </TabPane>
+
+            <TabPane
+              tab={
+                <span>
+                  <AreaChartOutlined />
+                  বার্ষিক বিশ্লেষণ
+                </span>
+              }
+              key="yearly"
+            >
+              {renderChart(dashboardData.salesProfitData.yearly, "yearly")}
+            </TabPane>
+          </Tabs>
+
+          {/* Data Summary */}
+          <Card title="ডেটা সারসংক্ষেপ" className="border-0 shadow-md">
+            <Row gutter={[16, 16]}>
+              <Col xs={24} sm={8}>
+                <div className="text-center p-4 bg-blue-50 rounded-lg">
+                  <div className="text-blue-600 font-bold text-lg">
+                    {dashboardData.totalOrders}
+                  </div>
+                  <div className="text-gray-600">মোট অর্ডার</div>
+                </div>
+              </Col>
+              <Col xs={24} sm={8}>
+                <div className="text-center p-4 bg-green-50 rounded-lg">
+                  <div className="text-green-600 font-bold text-lg">
+                    {dashboardData.totalProducts}
+                  </div>
+                  <div className="text-gray-600">মোট পণ্য</div>
+                </div>
+              </Col>
+              <Col xs={24} sm={8}>
+                <div className="text-center p-4 bg-purple-50 rounded-lg">
+                  <div className="text-purple-600 font-bold text-lg">
+                    {Math.round(
+                      (dashboardData.monthlyProfit /
+                        dashboardData.monthlySales) *
+                        100
+                    ) || 0}
+                    %
+                  </div>
+                  <div className="text-gray-600">লাভের হার</div>
+                </div>
+              </Col>
+            </Row>
+          </Card>
+        </div>
+      </Modal>
     </div>
   );
 };
