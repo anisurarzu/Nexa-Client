@@ -43,6 +43,9 @@ export default function LoginPage() {
       feature2: "ক্লাউড-ভিত্তিক সিস্টেম",
       feature1Desc: "রিয়েল টাইমে আপনার সম্পূর্ণ ইনভেন্টরি পরিচালনা করুন",
       feature2Desc: "যেকোনো জায়গা থেকে, যেকোনো ডিভাইসে অ্যাক্সেস করুন",
+      invalidCredentials: "ভুল ইউজার আইডি বা পাসওয়ার্ড",
+      networkError: "নেটওয়ার্ক সমস্যা। আবার চেষ্টা করুন",
+      serverError: "সার্ভার সমস্যা। পরে চেষ্টা করুন",
     },
     en: {
       title: "Welcome to Nexa Inventory",
@@ -65,6 +68,9 @@ export default function LoginPage() {
       feature2: "Cloud-Native System",
       feature1Desc: "Manage your entire inventory in real-time",
       feature2Desc: "Access anywhere, anytime, any device",
+      invalidCredentials: "Invalid user ID or password",
+      networkError: "Network error. Please try again",
+      serverError: "Server error. Please try again later",
     },
   };
 
@@ -74,36 +80,129 @@ export default function LoginPage() {
     return formData.loginID.trim() !== "" && formData.password.trim() !== "";
   };
 
-  const loginWithoutLocation = async (values) => {
+  // Get location with timeout
+  const getLocationData = async () => {
     try {
-      const loginPayload = {
-        ...values,
+      const position = await new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          reject(new Error("Geolocation timeout"));
+        }, 5000);
+
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            clearTimeout(timeoutId);
+            resolve(pos);
+          },
+          (err) => {
+            clearTimeout(timeoutId);
+            reject(err);
+          },
+          { timeout: 5000, maximumAge: 0 }
+        );
+      });
+
+      return {
+        latitude: position.coords.latitude.toString(),
+        longitude: position.coords.longitude.toString(),
+      };
+    } catch (error) {
+      console.log("Geolocation unavailable:", error.message);
+      return {
         latitude: "0.0",
         longitude: "0.0",
-        publicIP: "Unknown",
-        loginTime: new Date().toISOString(),
       };
-
-      const response = await coreAxios.post(`auth/login`, loginPayload);
-
-      if (response.status === 200) {
-        localStorage.setItem("token", response.data.token);
-        localStorage.setItem("userInfo", JSON.stringify(response.data.user));
-        router.push("/dashboard");
-      } else {
-        throw new Error("Login failed");
-      }
-    } catch (error) {
-      setError(
-        error.response?.data?.error || "Login failed. Please try again."
-      );
     }
   };
 
-  const onSubmit = async (e) => {
-    e.preventDefault();
+  // Get public IP with timeout
+  const getPublicIP = async () => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+      const ipResponse = await fetch("https://api.ipify.org?format=json", {
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      const ipData = await ipResponse.json();
+      return ipData.ip;
+    } catch (error) {
+      console.log("Could not fetch IP:", error.message);
+      return "Unknown";
+    }
+  };
+
+  // Perform login with proper error handling
+  const performLogin = async (loginPayload) => {
+    try {
+      console.log("🔐 Attempting login...", {
+        loginID: loginPayload.loginID,
+        latitude: loginPayload.latitude,
+        longitude: loginPayload.longitude,
+        publicIP: loginPayload.publicIP,
+      });
+
+      const response = await coreAxios.post("auth/login", loginPayload);
+
+      console.log("✅ Login response:", response.status, response.data);
+
+      if (response.status === 200 && response.data) {
+        if (!response.data.token) {
+          throw new Error("No token received from server");
+        }
+
+        // Store auth data
+        localStorage.setItem("token", response.data.token);
+        if (response.data.user) {
+          localStorage.setItem("userInfo", JSON.stringify(response.data.user));
+        }
+
+        console.log("✅ Login successful, redirecting to dashboard...");
+        router.push("/dashboard");
+        return true;
+      } else {
+        throw new Error("Invalid response from server");
+      }
+    } catch (error) {
+      console.error("❌ Login error:", {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+        fullError: error,
+      });
+
+      // Handle specific error types
+      if (error.response) {
+        const status = error.response.status;
+        const errorData = error.response.data;
+
+        if (status === 401 || status === 403) {
+          throw new Error(t.invalidCredentials);
+        } else if (status === 500 || status === 502 || status === 503) {
+          throw new Error(t.serverError);
+        } else if (errorData?.error) {
+          throw new Error(errorData.error);
+        } else if (errorData?.message) {
+          throw new Error(errorData.message);
+        } else {
+          throw new Error(`Server error (${status})`);
+        }
+      } else if (error.request) {
+        // Request made but no response
+        throw new Error(t.networkError);
+      } else {
+        // Something else happened
+        throw new Error(error.message || "Login failed. Please try again.");
+      }
+    }
+  };
+
+  const handleLogin = async () => {
+    // Mark fields as touched
     setTouched({ loginID: true, password: true });
 
+    // Validate
     if (!validateForm()) {
       setError(t.required);
       return;
@@ -113,50 +212,30 @@ export default function LoginPage() {
     setError("");
 
     try {
-      // Get user's location and IP - EXACTLY like your first code
-      const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject);
-      });
+      console.log("🚀 Starting login process...");
 
-      const latitude = position.coords.latitude.toString();
-      const longitude = position.coords.longitude.toString();
+      // Get location and IP in parallel
+      const [locationData, publicIP] = await Promise.all([
+        getLocationData(),
+        getPublicIP(),
+      ]);
 
-      // Get public IP
-      const ipResponse = await fetch("https://api.ipify.org?format=json");
-      const ipData = await ipResponse.json();
-      const publicIP = ipData.ip;
-
-      const loginTime = new Date().toISOString();
+      console.log("📍 Location data:", locationData);
+      console.log("🌐 Public IP:", publicIP);
 
       const loginPayload = {
-        ...formData,
-        latitude,
-        longitude,
-        publicIP,
-        loginTime,
+        loginID: formData.loginID.trim(),
+        password: formData.password,
+        latitude: locationData.latitude,
+        longitude: locationData.longitude,
+        publicIP: publicIP,
+        loginTime: new Date().toISOString(),
       };
 
-      const response = await coreAxios.post(`auth/login`, loginPayload);
-
-      if (response.status === 200) {
-        localStorage.setItem("token", response.data.token);
-        localStorage.setItem("userInfo", JSON.stringify(response.data.user));
-        router.push("/dashboard");
-      } else {
-        throw new Error("Login failed");
-      }
+      await performLogin(loginPayload);
     } catch (error) {
-      console.error("Login error:", error);
-
-      // Handle different types of errors - EXACTLY like your first code
-      if (error.name === "GeolocationPositionError") {
-        // If geolocation fails, try login without location data
-        await loginWithoutLocation(formData);
-      } else {
-        setError(
-          error.response?.data?.error || "Login failed. Please try again."
-        );
-      }
+      console.error("❌ Login process failed:", error);
+      setError(error.message || "Login failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -174,6 +253,12 @@ export default function LoginPage() {
 
   const handleFocus = (field) => {
     setFocused((prev) => ({ ...prev, [field]: true }));
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter" && !loading) {
+      handleLogin();
+    }
   };
 
   return (
@@ -244,14 +329,14 @@ export default function LoginPage() {
 
               {/* Error Message */}
               {error && (
-                <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center justify-between">
+                <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center justify-between animate-shake">
                   <span className="text-sm font-medium">{error}</span>
                   <button onClick={() => setError("")} className="text-red-500 hover:text-red-700">✕</button>
                 </div>
               )}
 
               {/* Login Form */}
-              <form onSubmit={onSubmit} className="space-y-6">
+              <div className="space-y-6">
                 {/* User ID Field */}
                 <div className="relative group">
                   <label className="block text-sm font-semibold text-slate-700 mb-2">
@@ -269,8 +354,10 @@ export default function LoginPage() {
                       onChange={(e) => handleInputChange("loginID", e.target.value)}
                       onFocus={() => handleFocus("loginID")}
                       onBlur={() => handleBlur("loginID")}
+                      onKeyPress={handleKeyPress}
                       placeholder={t.loginIDPlaceholder}
-                      className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white transition-all duration-300"
+                      disabled={loading}
+                      className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   </div>
                   {touched.loginID && !formData.loginID && (
@@ -295,13 +382,16 @@ export default function LoginPage() {
                       onChange={(e) => handleInputChange("password", e.target.value)}
                       onFocus={() => handleFocus("password")}
                       onBlur={() => handleBlur("password")}
+                      onKeyPress={handleKeyPress}
                       placeholder={t.passwordPlaceholder}
-                      className="w-full pl-12 pr-12 py-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white transition-all duration-300"
+                      disabled={loading}
+                      className="w-full pl-12 pr-12 py-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 text-slate-400 hover:text-emerald-500 transition-colors"
+                      disabled={loading}
+                      className="absolute right-4 text-slate-400 hover:text-emerald-500 transition-colors disabled:opacity-50"
                     >
                       {showPassword ? <EyeSlashIcon /> : <EyeIcon />}
                     </button>
@@ -324,7 +414,7 @@ export default function LoginPage() {
 
                 {/* Submit Button */}
                 <button
-                  type="submit"
+                  onClick={handleLogin}
                   disabled={loading}
                   className="group relative w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
@@ -345,7 +435,7 @@ export default function LoginPage() {
                     )}
                   </span>
                 </button>
-              </form>
+              </div>
 
               {/* Footer */}
               <div className="mt-8 pt-6 border-t border-slate-200 text-center text-sm text-slate-500">
@@ -411,6 +501,12 @@ export default function LoginPage() {
           50% { transform: translateY(-20px); }
         }
         
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-5px); }
+          75% { transform: translateX(5px); }
+        }
+        
         .animate-blob {
           animation: blob 7s infinite;
         }
@@ -421,6 +517,10 @@ export default function LoginPage() {
         
         .animation-delay-4000 {
           animation-delay: 4s;
+        }
+        
+        .animate-shake {
+          animation: shake 0.3s ease-in-out;
         }
       `}</style>
     </div>
