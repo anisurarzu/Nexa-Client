@@ -1,0 +1,14 @@
+# docker-compose.yml
+version: "3.8"
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: my-next-app:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      # load secrets from env_file or directly
+    restart: unless-stopped

@@ -239,14 +239,14 @@ const InventoryPage = () => {
   });
 
   const handleEdit = (record) => {
-    setEditingKey(record.productId);
+    setEditingKey(record._id);
     formik.setValues({
       productName: record.productName,
       category: record.category,
       description: record.description,
       qty: record.qty,
       unitPrice: record.unitPrice,
-      stockQTY: record.stockQTY,
+      stockQTY: record.qty,
       purchaseBy: record.purchaseBy,
       purchaseDate: record.purchaseDate ? dayjs(record.purchaseDate) : null,
       createdBy: userInfo?.loginID,
@@ -426,7 +426,7 @@ const InventoryPage = () => {
                 <Popconfirm
                   title="আপনি কি এই পণ্য ডিলিট করতে চান?"
                   description="এই কাজটি পূর্বাবস্থায় ফেরানো যাবে না!"
-                  onConfirm={() => handleDelete(item.productId)}
+                  onConfirm={() => handleDelete(item?._id)}
                   okText="হ্যাঁ"
                   cancelText="না"
                   okType="danger"
@@ -583,7 +583,7 @@ const InventoryPage = () => {
                   <Popconfirm
                     title="আপনি কি এই পণ্য ডিলিট করতে চান?"
                     description="এই কাজটি পূর্বাবস্থায় ফেরানো যাবে না!"
-                    onConfirm={() => handleDelete(record.productId)}
+                    onConfirm={() => handleDelete(record?._id)}
                     okText="হ্যাঁ"
                     cancelText="না"
                     okType="danger"
