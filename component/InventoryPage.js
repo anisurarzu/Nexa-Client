@@ -415,7 +415,7 @@ const InventoryPage = () => {
             {userInfo?.pagePermissions?.[4]?.editAccess === true && (
               <div className="flex gap-2 mt-2 pt-2 border-t border-gray-100">
                 <Button
-                  type="primary"
+                  type="primary" 
                   size="small"
                   icon={<EditOutlined />}
                   onClick={() => handleEdit(item)}
@@ -423,7 +423,7 @@ const InventoryPage = () => {
                 >
                   এডিট
                 </Button>
-                <Popconfirm
+                <Popconfirm 
                   title="আপনি কি এই পণ্য ডিলিট করতে চান?"
                   description="এই কাজটি পূর্বাবস্থায় ফেরানো যাবে না!"
                   onConfirm={() => handleDelete(item?._id)}

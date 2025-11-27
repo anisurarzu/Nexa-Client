@@ -44,6 +44,7 @@ import {
   ArrowUpOutlined,
   ArrowDownOutlined,
   CalendarOutlined,
+  CreditCardOutlined,
 } from "@ant-design/icons";
 import { Html5Qrcode } from "html5-qrcode";
 import coreAxios from "@/utils/axiosInstance";
@@ -286,9 +287,13 @@ const OrderEntry = () => {
           unitPrice: productData.unitPrice,
           salePrice: productData.unitPrice,
           quantity: 1,
-          availableQuantity: productData.quantity || 100, // Default to 100 if not available
-          orderDate: dayjs(), // Set current date as default
+          availableQuantity: productData.quantity || 100,
+          orderDate: dayjs(),
+          paymentMethod: "Cash",
         });
+
+        // Calculate totalAmount and dueAmount after setting form values
+        calculateTotalAndDueAmount(scanForm);
 
         message.success("পণ্য সফলভাবে স্ক্যান করা হয়েছে!");
       } else {
@@ -300,6 +305,37 @@ const OrderEntry = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Calculate totalAmount and dueAmount
+  const calculateTotalAndDueAmount = (form) => {
+    const quantity = form.getFieldValue("quantity") || 0;
+    const salePrice = form.getFieldValue("salePrice") || 0;
+    const paidAmount = form.getFieldValue("paidAmount") || 0;
+    
+    const totalAmount = quantity * salePrice;
+    const dueAmount = Math.max(0, totalAmount - paidAmount);
+
+    form.setFieldsValue({
+      totalAmount: totalAmount,
+      dueAmount: dueAmount
+    });
+  };
+
+  // Handle quantity or price change
+  const handleAmountChange = (form) => {
+    calculateTotalAndDueAmount(form);
+  };
+
+  // Handle paid amount change
+  const handlePaidAmountChange = (form) => {
+    const totalAmount = form.getFieldValue("totalAmount") || 0;
+    const paidAmount = form.getFieldValue("paidAmount") || 0;
+    const dueAmount = Math.max(0, totalAmount - paidAmount);
+    
+    form.setFieldsValue({
+      dueAmount: dueAmount
+    });
   };
 
   const startQRScanner = () => {
@@ -317,7 +353,11 @@ const OrderEntry = () => {
       return;
     }
 
-    const total = values.salePrice * values.quantity;
+    const quantity = values.quantity || 0;
+    const salePrice = values.salePrice || 0;
+    const totalAmount = quantity * salePrice;
+    const paidAmount = values.paidAmount || 0;
+    const dueAmount = totalAmount - paidAmount;
 
     // Create order immediately when adding product
     const orderData = {
@@ -327,18 +367,20 @@ const OrderEntry = () => {
       unitPrice: values.unitPrice,
       salePrice: values.salePrice,
       quantity: values.quantity,
-      total: total,
+      total: totalAmount,
       customerName: values.customerName || "Walk-in Customer",
       customerPhone: values.customerPhone || "N/A",
       customerAddress: values.customerAddress || "N/A",
-      totalAmount: total,
-      grandTotal: total,
-      paymentMethod: "Cash",
-      createdBy: currentUser, // localStorage থেকে username ব্যবহার করা হচ্ছে
-      status: "Pending", // Default status
+      totalAmount: totalAmount,
+      grandTotal: totalAmount,
+      paymentMethod: values.paymentMethod || "Cash",
+      paidAmount: paidAmount,
+      dueAmount: Math.max(0, dueAmount),
+      createdBy: currentUser,
+      status: "Pending",
       orderDate: values.orderDate
         ? values.orderDate.toISOString()
-        : new Date().toISOString(), // Add order date
+        : new Date().toISOString(),
     };
 
     console.log("Order Data to be sent:", orderData);
@@ -367,6 +409,12 @@ const OrderEntry = () => {
               <Text type="secondary" style={{ fontSize: "12px" }}>
                 অর্ডার তারিখ: {dayjs(orderData.orderDate).format("DD/MM/YYYY")}
               </Text>
+              <br />
+              {dueAmount > 0 && (
+                <Text type="warning" style={{ fontSize: "12px" }}>
+                  বাকি আছে: ৳{dueAmount}
+                </Text>
+              )}
             </div>
           ),
           duration: 5,
@@ -402,7 +450,11 @@ const OrderEntry = () => {
       return;
     }
 
-    const total = values.salePrice * values.quantity;
+    const quantity = values.quantity || 0;
+    const salePrice = values.salePrice || 0;
+    const totalAmount = quantity * salePrice;
+    const paidAmount = values.paidAmount || 0;
+    const dueAmount = totalAmount - paidAmount;
 
     // Create order immediately when scanning product
     const orderData = {
@@ -412,18 +464,20 @@ const OrderEntry = () => {
       unitPrice: values.unitPrice,
       salePrice: values.salePrice,
       quantity: values.quantity,
-      total: total,
+      total: totalAmount,
       customerName: values.customerName || "Walk-in Customer",
       customerPhone: values.customerPhone || "N/A",
       customerAddress: values.customerAddress || "N/A",
-      totalAmount: total,
-      grandTotal: total,
-      paymentMethod: "Cash",
-      createdBy: currentUser, // localStorage থেকে username ব্যবহার করা হচ্ছে
-      status: "Pending", // Default status
+      totalAmount: totalAmount,
+      grandTotal: totalAmount,
+      paymentMethod: values.paymentMethod || "Cash",
+      paidAmount: paidAmount,
+      dueAmount: Math.max(0, dueAmount),
+      createdBy: currentUser,
+      status: "Pending",
       orderDate: values.orderDate
         ? values.orderDate.toISOString()
-        : new Date().toISOString(), // Add order date
+        : new Date().toISOString(),
     };
 
     console.log("Order Data to be sent:", orderData);
@@ -452,6 +506,12 @@ const OrderEntry = () => {
               <Text type="secondary" style={{ fontSize: "12px" }}>
                 অর্ডার তারিখ: {dayjs(orderData.orderDate).format("DD/MM/YYYY")}
               </Text>
+              <br />
+              {dueAmount > 0 && (
+                <Text type="warning" style={{ fontSize: "12px" }}>
+                  বাকি আছে: ৳{dueAmount}
+                </Text>
+              )}
             </div>
           ),
           duration: 5,
@@ -488,10 +548,14 @@ const OrderEntry = () => {
         category: selectedProduct.category,
         unitPrice: selectedProduct.unitPrice,
         salePrice: selectedProduct.unitPrice,
-        quantity: 1, // Set default quantity to 1
-        availableQuantity: selectedProduct.quantity || 100, // Set available quantity
-        orderDate: dayjs(), // Set current date as default
+        quantity: 1,
+        availableQuantity: selectedProduct.quantity || 100,
+        orderDate: dayjs(),
+        paymentMethod: "Cash",
       });
+
+      // Calculate totalAmount and dueAmount after setting form values
+      calculateTotalAndDueAmount(addOrderForm);
     }
   };
 
@@ -524,7 +588,7 @@ const OrderEntry = () => {
     try {
       const response = await coreAxios.put(`/productOrders/${orderId}`, {
         status: newStatus,
-        updatedBy: currentUser, // আপডেট করছেন কে তা যোগ করা
+        updatedBy: currentUser,
       });
       if (response.data.success) {
         message.success("অর্ডার স্ট্যাটাস সফলভাবে আপডেট হয়েছে!");
@@ -554,7 +618,10 @@ const OrderEntry = () => {
       customerAddress: order.customerAddress,
       status: order.status,
       paymentMethod: order.paymentMethod,
-      orderDate: order.orderDate ? dayjs(order.orderDate) : dayjs(), // Set order date
+      paidAmount: order.paidAmount || 0,
+      dueAmount: order.dueAmount || 0,
+      totalAmount: order.totalAmount || order.grandTotal,
+      orderDate: order.orderDate ? dayjs(order.orderDate) : dayjs(),
     });
     setEditOrderModalVisible(true);
   };
@@ -562,18 +629,23 @@ const OrderEntry = () => {
   // Update Order - সম্পূর্ণ অর্ডার আপডেট করার ফাংশন
   const updateOrder = async (values) => {
     try {
-      // Calculate new total
-      const total = values.salePrice * values.quantity;
+      const quantity = values.quantity || 0;
+      const salePrice = values.salePrice || 0;
+      const totalAmount = quantity * salePrice;
+      const paidAmount = values.paidAmount || 0;
+      const dueAmount = totalAmount - paidAmount;
 
       const updateData = {
         ...values,
-        total: total,
-        grandTotal: total,
-        totalAmount: total,
-        updatedBy: currentUser, // আপডেট করছেন কে তা যোগ করা
+        total: totalAmount,
+        grandTotal: totalAmount,
+        totalAmount: totalAmount,
+        paidAmount: paidAmount,
+        dueAmount: Math.max(0, dueAmount),
+        updatedBy: currentUser,
         orderDate: values.orderDate
           ? values.orderDate.toISOString()
-          : new Date().toISOString(), // Add order date
+          : new Date().toISOString(),
       };
 
       const response = await coreAxios.put(
@@ -668,28 +740,26 @@ const OrderEntry = () => {
       render: (quantity) => <Text>{quantity} পিস</Text>,
     },
     {
-      title: "দাম",
-      dataIndex: "salePrice",
-      key: "salePrice",
-      render: (price) => <Text>৳{price}</Text>,
-    },
-    {
       title: "মোট",
       dataIndex: "grandTotal",
       key: "grandTotal",
       render: (amount) => <Text strong>৳{amount}</Text>,
     },
     {
+      title: "বাকি",
+      dataIndex: "dueAmount",
+      key: "dueAmount",
+      render: (dueAmount) => (
+        <Text strong type={dueAmount > 0 ? "danger" : "success"}>
+          ৳{dueAmount || 0}
+        </Text>
+      ),
+    },
+    {
       title: "অর্ডার তারিখ",
       dataIndex: "orderDate",
       key: "orderDate",
       render: (date) => dayjs(date).format("DD/MM/YYYY HH:mm"),
-    },
-    {
-      title: "তৈরি করেছেন",
-      dataIndex: "createdBy",
-      key: "createdBy",
-      render: (createdBy) => <Tag color="blue">{createdBy}</Tag>,
     },
     {
       title: "স্ট্যাটাস",
@@ -710,7 +780,8 @@ const OrderEntry = () => {
             className="cursor-pointer"
             onClick={() => handleStatusChange(record._id, status)}
           >
-            {status}
+            <p>{status}</p>
+            <p>{record?.createdBy}</p>
           </Tag>
         </Tooltip>
       ),
@@ -873,7 +944,9 @@ const OrderEntry = () => {
             className="mt-4"
             initialValues={{
               quantity: 1,
-              orderDate: dayjs(), // Set current date as default
+              orderDate: dayjs(),
+              paymentMethod: "Cash",
+              paidAmount: 0,
             }}
           >
             {/* Customer Information in Modal - Not Required */}
@@ -944,14 +1017,12 @@ const OrderEntry = () => {
                       showSearch
                       onChange={handleProductSelect}
                       filterOption={(input, option) => {
-                        // Safely handle option.children which might be undefined or not a string
                         const children = option?.children;
                         if (typeof children === "string") {
                           return children
                             .toLowerCase()
                             .includes(input.toLowerCase());
                         }
-                        // If children is not a string (React element, etc.), convert to string
                         return String(children || "")
                           .toLowerCase()
                           .includes(input.toLowerCase());
@@ -998,6 +1069,7 @@ const OrderEntry = () => {
                       formatter={(value) => `৳ ${value}`}
                       parser={(value) => value.replace(/৳\s?/g, "")}
                       size="large"
+                      onChange={() => handleAmountChange(addOrderForm)}
                     />
                   </Form.Item>
                 </Col>
@@ -1015,7 +1087,82 @@ const OrderEntry = () => {
                       min={1}
                       defaultValue={1}
                       size="large"
+                      onChange={() => handleAmountChange(addOrderForm)}
                     />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              {/* Amount Calculation Section */}
+              <Card title="Amount গণনা" size="small" className="mb-4">
+                <Row gutter={16}>
+                  <Col xs={24} md={8}>
+                    <Form.Item name="totalAmount" label="মোট Amount">
+                      <InputNumber
+                        className="w-full"
+                        min={0}
+                        formatter={(value) => `৳ ${value}`}
+                        parser={(value) => value.replace(/৳\s?/g, "")}
+                        size="large"
+                        readOnly
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={8}>
+                    <Form.Item
+                      name="paidAmount"
+                      label="পরিশোধিত Amount"
+                    >
+                      <InputNumber
+                        className="w-full"
+                        min={0}
+                        formatter={(value) => `৳ ${value}`}
+                        parser={(value) => value.replace(/৳\s?/g, "")}
+                        size="large"
+                        onChange={() => handlePaidAmountChange(addOrderForm)}
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={8}>
+                    <Form.Item
+                      name="dueAmount"
+                      label="বাকি Amount"
+                    >
+                      <InputNumber
+                        className="w-full"
+                        min={0}
+                        formatter={(value) => `৳ ${value}`}
+                        parser={(value) => value.replace(/৳\s?/g, "")}
+                        size="large"
+                        readOnly
+                        disabled
+                      />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              </Card>
+
+              {/* Payment Method */}
+              <Row gutter={16}>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name="paymentMethod"
+                    label="পেমেন্ট মেথড"
+                    rules={[
+                      { required: true, message: "পেমেন্ট মেথড নির্বাচন করুন" },
+                    ]}
+                  >
+                    <Select
+                      placeholder="পেমেন্ট মেথড"
+                      size="large"
+                    >
+                      <Option value="Cash">Cash</Option>
+                      <Option value="Card">Card</Option>
+                      <Option value="Mobile Banking">Mobile Banking</Option>
+                      <Option value="Bank Transfer">Bank Transfer</Option>
+                      <Option value="Due">Due</Option>
+                      <Option value="Partial">Partial</Option>
+                    </Select>
                   </Form.Item>
                 </Col>
               </Row>
@@ -1119,7 +1266,13 @@ const OrderEntry = () => {
                   </Tag>
                 </Descriptions.Item>
                 <Descriptions.Item label="মোট Amount">
-                  <Text strong>৳{selectedOrder.grandTotal}</Text>
+                  <Text strong>৳{selectedOrder.totalAmount || selectedOrder.grandTotal}</Text>
+                </Descriptions.Item>
+                <Descriptions.Item label="পরিশোধিত Amount">
+                  <Text type="success">৳{selectedOrder.paidAmount || 0}</Text>
+                </Descriptions.Item>
+                <Descriptions.Item label="বাকি Amount">
+                  <Text type="danger">৳{selectedOrder.dueAmount || 0}</Text>
                 </Descriptions.Item>
                 <Descriptions.Item label="পেমেন্ট মেথড">
                   {selectedOrder.paymentMethod}
@@ -1148,7 +1301,7 @@ const OrderEntry = () => {
                     render: (total) => `৳${total}`,
                   },
                 ]}
-                dataSource={[selectedOrder]} // Since it's single product order, wrap in array
+                dataSource={[selectedOrder]}
                 pagination={false}
                 size="small"
                 rowKey="productId"
@@ -1242,6 +1395,7 @@ const OrderEntry = () => {
                       formatter={(value) => `৳ ${value}`}
                       parser={(value) => value.replace(/৳\s?/g, "")}
                       size="large"
+                      onChange={() => handleAmountChange(editOrderForm)}
                     />
                   </Form.Item>
                 </Col>
@@ -1251,7 +1405,86 @@ const OrderEntry = () => {
                     label="পরিমাণ"
                     rules={[{ required: true, message: "পরিমাণ লিখুন" }]}
                   >
-                    <InputNumber className="w-full" min={1} size="large" />
+                    <InputNumber 
+                      className="w-full" 
+                      min={1} 
+                      size="large" 
+                      onChange={() => handleAmountChange(editOrderForm)}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              {/* Amount Calculation Section in Edit Modal */}
+              <Card title="Amount গণনা" size="small" className="mb-4">
+                <Row gutter={16}>
+                  <Col xs={24} md={8}>
+                    <Form.Item name="totalAmount" label="মোট Amount">
+                      <InputNumber
+                        className="w-full"
+                        min={0}
+                        formatter={(value) => `৳ ${value}`}
+                        parser={(value) => value.replace(/৳\s?/g, "")}
+                        size="large"
+                        readOnly
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={8}>
+                    <Form.Item
+                      name="paidAmount"
+                      label="পরিশোধিত Amount"
+                    >
+                      <InputNumber
+                        className="w-full"
+                        min={0}
+                        formatter={(value) => `৳ ${value}`}
+                        parser={(value) => value.replace(/৳\s?/g, "")}
+                        size="large"
+                        onChange={() => handlePaidAmountChange(editOrderForm)}
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={8}>
+                    <Form.Item
+                      name="dueAmount"
+                      label="বাকি Amount"
+                    >
+                      <InputNumber
+                        className="w-full"
+                        min={0}
+                        formatter={(value) => `৳ ${value}`}
+                        parser={(value) => value.replace(/৳\s?/g, "")}
+                        size="large"
+                        readOnly
+                        disabled
+                      />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              </Card>
+
+              {/* Payment Method in Edit Modal */}
+              <Row gutter={16}>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name="paymentMethod"
+                    label="পেমেন্ট মেথড"
+                    rules={[
+                      { required: true, message: "পেমেন্ট মেথড নির্বাচন করুন" },
+                    ]}
+                  >
+                    <Select
+                      placeholder="পেমেন্ট মেথড"
+                      size="large"
+                    >
+                      <Option value="Cash">Cash</Option>
+                      <Option value="Card">Card</Option>
+                      <Option value="Mobile Banking">Mobile Banking</Option>
+                      <Option value="Bank Transfer">Bank Transfer</Option>
+                      <Option value="Due">Due</Option>
+                      <Option value="Partial">Partial</Option>
+                    </Select>
                   </Form.Item>
                 </Col>
               </Row>
@@ -1287,16 +1520,6 @@ const OrderEntry = () => {
                       <Option value="Processing">Processing</Option>
                       <Option value="Completed">Completed</Option>
                       <Option value="Cancelled">Cancelled</Option>
-                    </Select>
-                  </Form.Item>
-                </Col>
-                <Col xs={24} md={12}>
-                  <Form.Item name="paymentMethod" label="পেমেন্ট মেথড">
-                    <Select size="large">
-                      <Option value="Cash">Cash</Option>
-                      <Option value="Card">Card</Option>
-                      <Option value="Mobile Banking">Mobile Banking</Option>
-                      <Option value="Bank Transfer">Bank Transfer</Option>
                     </Select>
                   </Form.Item>
                 </Col>
@@ -1371,8 +1594,10 @@ const OrderEntry = () => {
               onFinish={handleScanOrder}
               layout="vertical"
               initialValues={{
-                quantity: 1, // Set default quantity to 1
-                orderDate: dayjs(), // Set current date as default
+                quantity: 1,
+                orderDate: dayjs(),
+                paymentMethod: "Cash",
+                paidAmount: 0,
               }}
             >
               {/* Customer Information in Scan Modal - Not Required */}
@@ -1447,6 +1672,7 @@ const OrderEntry = () => {
                         formatter={(value) => `৳ ${value}`}
                         parser={(value) => value.replace(/৳\s?/g, "")}
                         size="large"
+                        onChange={() => handleAmountChange(scanForm)}
                       />
                     </Form.Item>
                   </Col>
@@ -1464,7 +1690,82 @@ const OrderEntry = () => {
                         min={1}
                         defaultValue={1}
                         size="large"
+                        onChange={() => handleAmountChange(scanForm)}
                       />
+                    </Form.Item>
+                  </Col>
+                </Row>
+
+                {/* Amount Calculation Section in Scan Modal */}
+                <Card title="Amount গণনা" size="small" className="mb-4">
+                  <Row gutter={16}>
+                    <Col xs={24} md={8}>
+                      <Form.Item name="totalAmount" label="মোট Amount">
+                        <InputNumber
+                          className="w-full"
+                          min={0}
+                          formatter={(value) => `৳ ${value}`}
+                          parser={(value) => value.replace(/৳\s?/g, "")}
+                          size="large"
+                          readOnly
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} md={8}>
+                      <Form.Item
+                        name="paidAmount"
+                        label="পরিশোধিত Amount"
+                      >
+                        <InputNumber
+                          className="w-full"
+                          min={0}
+                          formatter={(value) => `৳ ${value}`}
+                          parser={(value) => value.replace(/৳\s?/g, "")}
+                          size="large"
+                          onChange={() => handlePaidAmountChange(scanForm)}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} md={8}>
+                      <Form.Item
+                        name="dueAmount"
+                        label="বাকি Amount"
+                      >
+                        <InputNumber
+                          className="w-full"
+                          min={0}
+                          formatter={(value) => `৳ ${value}`}
+                          parser={(value) => value.replace(/৳\s?/g, "")}
+                          size="large"
+                          readOnly
+                          disabled
+                        />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                </Card>
+
+                {/* Payment Method in Scan Modal */}
+                <Row gutter={16}>
+                  <Col xs={24} md={12}>
+                    <Form.Item
+                      name="paymentMethod"
+                      label="পেমেন্ট মেথড"
+                      rules={[
+                        { required: true, message: "পেমেন্ট মেথড নির্বাচন করুন" },
+                      ]}
+                    >
+                      <Select
+                        placeholder="পেমেন্ট মেথড"
+                        size="large"
+                      >
+                        <Option value="Cash">Cash</Option>
+                        <Option value="Card">Card</Option>
+                        <Option value="Mobile Banking">Mobile Banking</Option>
+                        <Option value="Bank Transfer">Bank Transfer</Option>
+                        <Option value="Due">Due</Option>
+                        <Option value="Partial">Partial</Option>
+                      </Select>
                     </Form.Item>
                   </Col>
                 </Row>
