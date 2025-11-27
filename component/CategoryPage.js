@@ -59,16 +59,34 @@ const CategoryPage = () => {
   const userInfo = JSON.parse(localStorage.getItem("userInfo"));
 
   // Category types for electronics
-  const categoryTypes = [
-    { value: "electronics", label: "ইলেকট্রনিক্স" },
-    { value: "accessories", label: "অ্যাকসেসরিজ" },
-    { value: "home_appliances", label: "হোম অ্যাপ্লায়েন্সেস" },
-    { value: "computers", label: "কম্পিউটার" },
-    { value: "mobile", label: "মোবাইল" },
-    { value: "audio_video", label: "অডিও-ভিডিও" },
-    { value: "gaming", label: "গেমিং" },
-    { value: "networking", label: "নেটওয়ার্কিং" },
-  ];
+ const categoryTypes = [
+   { value: "clothing", label: "পোশাক" },
+     { value: "furniture", label: "ফার্নিচার" },
+  { value: "jewelry", label: "গহনা" },
+  { value: "electronics", label: "ইলেকট্রনিক্স" },
+  { value: "accessories", label: "অ্যাকসেসরিজ" },
+  { value: "home_appliances", label: "হোম অ্যাপ্লায়েন্সেস" },
+  { value: "computers", label: "কম্পিউটার" },
+  { value: "mobile", label: "মোবাইল" },
+  { value: "audio_video", label: "অডিও-ভিডিও" },
+  { value: "gaming", label: "গেমিং" },
+  { value: "networking", label: "নেটওয়ার্কিং" },
+ 
+  { value: "medicine", label: "ঔষধ" },
+  { value: "books", label: "বই" },
+  { value: "food", label: "খাবার" },
+  { value: "beverages", label: "পানীয়" },
+  { value: "cosmetics", label: "প্রসাধনী" },
+  { value: "toys", label: "খেলনা" },
+  { value: "automotive", label: "অটোমোটিভ" },
+  { value: "tools", label: "টুলস" },
+  { value: "stationery", label: "স্টেশনারি" },
+  { value: "baby_products", label: "শিশু পণ্য" },
+  { value: "beauty", label: "সৌন্দর্য" },
+  { value: "fashion", label: "ফ্যাশন" },
+ 
+ 
+  ]
 
   // Status options
   const statusOptions = [
