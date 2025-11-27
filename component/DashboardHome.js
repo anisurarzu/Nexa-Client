@@ -36,6 +36,7 @@ import {
   FallOutlined,
   LineChartOutlined,
   AreaChartOutlined,
+  MoneyCollectOutlined,
 } from "@ant-design/icons";
 import { useState, useEffect } from "react";
 import coreAxios from "@/utils/axiosInstance";
@@ -72,6 +73,7 @@ const cardColors = {
   lime: "#84cc16", // Lime
   rose: "#f43f5e", // Rose
   sky: "#0ea5e9", // Sky
+  red: "#ef4444", // Red for expenses
 };
 
 // Solid background colors for category cards
@@ -104,13 +106,26 @@ const DashboardHome = () => {
     recentOrders: [],
     inventoryStats: [],
     productStockValues: [],
-    // New profit fields
+    // Profit fields
     dailyProfit: 0,
     monthlyProfit: 0,
     yearlyProfit: 0,
+    // Expense fields
+    dailyExpenses: 0,
+    monthlyExpenses: 0,
+    yearlyExpenses: 0,
+    // Net Profit (Profit - Expenses)
+    dailyNetProfit: 0,
+    monthlyNetProfit: 0,
+    yearlyNetProfit: 0,
     recentOrdersWithProfit: [],
     // Chart data
     salesProfitData: {
+      daily: [],
+      monthly: [],
+      yearly: [],
+    },
+    expenseData: {
       daily: [],
       monthly: [],
       yearly: [],
@@ -146,8 +161,37 @@ const DashboardHome = () => {
     };
   };
 
-  // Generate sample chart data (in real app, this would come from API)
-  const generateChartData = (orders, products, period) => {
+  // Function to calculate expenses for a period
+  const calculateExpenses = (expenses, period) => {
+    const now = new Date();
+    let totalExpenses = 0;
+
+    expenses.forEach((expense) => {
+      const expenseDate = new Date(expense.expenseDate || expense.createdAt);
+      
+      if (period === "daily") {
+        if (expenseDate.toDateString() === now.toDateString()) {
+          totalExpenses += parseFloat(expense.amount || 0);
+        }
+      } else if (period === "monthly") {
+        if (
+          expenseDate.getMonth() === now.getMonth() &&
+          expenseDate.getFullYear() === now.getFullYear()
+        ) {
+          totalExpenses += parseFloat(expense.amount || 0);
+        }
+      } else if (period === "yearly") {
+        if (expenseDate.getFullYear() === now.getFullYear()) {
+          totalExpenses += parseFloat(expense.amount || 0);
+        }
+      }
+    });
+
+    return totalExpenses;
+  };
+
+  // Generate chart data with expenses
+  const generateChartData = (orders, products, expenses, period) => {
     const data = [];
     const now = new Date();
 
@@ -163,7 +207,9 @@ const DashboardHome = () => {
 
         let dailySales = 0;
         let dailyProfit = 0;
+        let dailyExpenses = 0;
 
+        // Calculate sales and profit from orders
         orders.forEach((order) => {
           if (order.status === "Cancelled") return;
 
@@ -175,10 +221,22 @@ const DashboardHome = () => {
           }
         });
 
+        // Calculate expenses for the day
+        expenses.forEach((expense) => {
+          const expenseDate = new Date(expense.expenseDate || expense.createdAt);
+          if (expenseDate.toDateString() === date.toDateString()) {
+            dailyExpenses += parseFloat(expense.amount || 0);
+          }
+        });
+
+        const dailyNetProfit = dailyProfit - dailyExpenses;
+
         data.push({
           name: dateStr,
           sales: dailySales,
           profit: dailyProfit,
+          expenses: dailyExpenses,
+          netProfit: dailyNetProfit,
           revenue: dailySales,
         });
       }
@@ -194,7 +252,9 @@ const DashboardHome = () => {
 
         let monthlySales = 0;
         let monthlyProfit = 0;
+        let monthlyExpenses = 0;
 
+        // Calculate sales and profit from orders
         orders.forEach((order) => {
           if (order.status === "Cancelled") return;
 
@@ -209,10 +269,25 @@ const DashboardHome = () => {
           }
         });
 
+        // Calculate expenses for the month
+        expenses.forEach((expense) => {
+          const expenseDate = new Date(expense.expenseDate || expense.createdAt);
+          if (
+            expenseDate.getMonth() === date.getMonth() &&
+            expenseDate.getFullYear() === date.getFullYear()
+          ) {
+            monthlyExpenses += parseFloat(expense.amount || 0);
+          }
+        });
+
+        const monthlyNetProfit = monthlyProfit - monthlyExpenses;
+
         data.push({
           name: monthStr,
           sales: monthlySales,
           profit: monthlyProfit,
+          expenses: monthlyExpenses,
+          netProfit: monthlyNetProfit,
           revenue: monthlySales,
         });
       }
@@ -224,7 +299,9 @@ const DashboardHome = () => {
 
         let yearlySales = 0;
         let yearlyProfit = 0;
+        let yearlyExpenses = 0;
 
+        // Calculate sales and profit from orders
         orders.forEach((order) => {
           if (order.status === "Cancelled") return;
 
@@ -236,10 +313,22 @@ const DashboardHome = () => {
           }
         });
 
+        // Calculate expenses for the year
+        expenses.forEach((expense) => {
+          const expenseDate = new Date(expense.expenseDate || expense.createdAt);
+          if (expenseDate.getFullYear() === year) {
+            yearlyExpenses += parseFloat(expense.amount || 0);
+          }
+        });
+
+        const yearlyNetProfit = yearlyProfit - yearlyExpenses;
+
         data.push({
           name: yearStr,
           sales: yearlySales,
           profit: yearlyProfit,
+          expenses: yearlyExpenses,
+          netProfit: yearlyNetProfit,
           revenue: yearlySales,
         });
       }
@@ -261,6 +350,11 @@ const DashboardHome = () => {
       const ordersResponse = await coreAxios.get("/productOrders");
       const ordersData = ordersResponse.data;
       const orders = ordersData?.data || ordersData || [];
+
+      // Fetch expenses data
+      const expensesResponse = await coreAxios.get("/expense");
+      const expensesData = expensesResponse.data;
+      const expenses = expensesData?.expenses || expensesData || [];
 
       // Fetch financial summary
       const financialResponse = await coreAxios.get("/getFinancialSummary");
@@ -363,6 +457,16 @@ const DashboardHome = () => {
         }
       });
 
+      // Calculate expenses
+      const dailyExpenses = calculateExpenses(expenses, "daily");
+      const monthlyExpenses = calculateExpenses(expenses, "monthly");
+      const yearlyExpenses = calculateExpenses(expenses, "yearly");
+
+      // Calculate net profit (profit - expenses)
+      const dailyNetProfit = dailyProfit - dailyExpenses;
+      const monthlyNetProfit = monthlyProfit - monthlyExpenses;
+      const yearlyNetProfit = yearlyProfit - yearlyExpenses;
+
       // Get recent orders with profit information
       const recentOrdersWithProfit = orders
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
@@ -409,11 +513,11 @@ const DashboardHome = () => {
         }))
         .slice(0, 6);
 
-      // Generate chart data
+      // Generate chart data with expenses
       const salesProfitData = {
-        daily: generateChartData(orders, products, "daily"),
-        monthly: generateChartData(orders, products, "monthly"),
-        yearly: generateChartData(orders, products, "yearly"),
+        daily: generateChartData(orders, products, expenses, "daily"),
+        monthly: generateChartData(orders, products, expenses, "monthly"),
+        yearly: generateChartData(orders, products, expenses, "yearly"),
       };
 
       setDashboardData({
@@ -435,6 +539,14 @@ const DashboardHome = () => {
         dailyProfit,
         monthlyProfit,
         yearlyProfit,
+        // Expense data
+        dailyExpenses,
+        monthlyExpenses,
+        yearlyExpenses,
+        // Net profit data
+        dailyNetProfit,
+        monthlyNetProfit,
+        yearlyNetProfit,
         recentOrdersWithProfit,
         // Chart data
         salesProfitData,
@@ -500,7 +612,11 @@ const DashboardHome = () => {
                 name === "sales"
                   ? "বিক্রয়"
                   : name === "profit"
-                  ? "লাভ"
+                  ? "মোট লাভ"
+                  : name === "expenses"
+                  ? "খরচ"
+                  : name === "netProfit"
+                  ? "নিট লাভ"
                   : "রাজস্ব",
               ]}
               labelFormatter={(label) => `সময়: ${label}`}
@@ -510,7 +626,11 @@ const DashboardHome = () => {
                 value === "sales"
                   ? "বিক্রয়"
                   : value === "profit"
-                  ? "লাভ"
+                  ? "মোট লাভ"
+                  : value === "expenses"
+                  ? "খরচ"
+                  : value === "netProfit"
+                  ? "নিট লাভ"
                   : "রাজস্ব"
               }
             />
@@ -526,11 +646,29 @@ const DashboardHome = () => {
             <Line
               type="monotone"
               dataKey="profit"
+              stroke="#f59e0b"
+              strokeWidth={3}
+              dot={{ fill: "#f59e0b", strokeWidth: 2, r: 4 }}
+              activeDot={{ r: 6, stroke: "#f59e0b", strokeWidth: 2 }}
+              name="profit"
+            />
+            <Line
+              type="monotone"
+              dataKey="expenses"
+              stroke="#ef4444"
+              strokeWidth={3}
+              dot={{ fill: "#ef4444", strokeWidth: 2, r: 4 }}
+              activeDot={{ r: 6, stroke: "#ef4444", strokeWidth: 2 }}
+              name="expenses"
+            />
+            <Line
+              type="monotone"
+              dataKey="netProfit"
               stroke="#10b981"
               strokeWidth={3}
               dot={{ fill: "#10b981", strokeWidth: 2, r: 4 }}
               activeDot={{ r: 6, stroke: "#10b981", strokeWidth: 2 }}
-              name="profit"
+              name="netProfit"
             />
           </LineChart>
         </ResponsiveContainer>
@@ -559,7 +697,11 @@ const DashboardHome = () => {
                 name === "sales"
                   ? "বিক্রয়"
                   : name === "profit"
-                  ? "লাভ"
+                  ? "মোট লাভ"
+                  : name === "expenses"
+                  ? "খরচ"
+                  : name === "netProfit"
+                  ? "নিট লাভ"
                   : "রাজস্ব",
               ]}
               labelFormatter={(label) => `সময়: ${label}`}
@@ -569,7 +711,11 @@ const DashboardHome = () => {
                 value === "sales"
                   ? "বিক্রয়"
                   : value === "profit"
-                  ? "লাভ"
+                  ? "মোট লাভ"
+                  : value === "expenses"
+                  ? "খরচ"
+                  : value === "netProfit"
+                  ? "নিট লাভ"
                   : "রাজস্ব"
               }
             />
@@ -587,11 +733,31 @@ const DashboardHome = () => {
               type="monotone"
               dataKey="profit"
               stackId="2"
+              stroke="#f59e0b"
+              fill="#f59e0b"
+              fillOpacity={0.6}
+              strokeWidth={2}
+              name="profit"
+            />
+            <Area
+              type="monotone"
+              dataKey="expenses"
+              stackId="3"
+              stroke="#ef4444"
+              fill="#ef4444"
+              fillOpacity={0.6}
+              strokeWidth={2}
+              name="expenses"
+            />
+            <Area
+              type="monotone"
+              dataKey="netProfit"
+              stackId="4"
               stroke="#10b981"
               fill="#10b981"
               fillOpacity={0.6}
               strokeWidth={2}
-              name="profit"
+              name="netProfit"
             />
           </AreaChart>
         </ResponsiveContainer>
@@ -620,7 +786,11 @@ const DashboardHome = () => {
                 name === "sales"
                   ? "বিক্রয়"
                   : name === "profit"
-                  ? "লাভ"
+                  ? "মোট লাভ"
+                  : name === "expenses"
+                  ? "খরচ"
+                  : name === "netProfit"
+                  ? "নিট লাভ"
                   : "রাজস্ব",
               ]}
               labelFormatter={(label) => `সময়: ${label}`}
@@ -630,7 +800,11 @@ const DashboardHome = () => {
                 value === "sales"
                   ? "বিক্রয়"
                   : value === "profit"
-                  ? "লাভ"
+                  ? "মোট লাভ"
+                  : value === "expenses"
+                  ? "খরচ"
+                  : value === "netProfit"
+                  ? "নিট লাভ"
                   : "রাজস্ব"
               }
             />
@@ -642,8 +816,20 @@ const DashboardHome = () => {
             />
             <Bar
               dataKey="profit"
-              fill="#10b981"
+              fill="#f59e0b"
               name="profit"
+              radius={[4, 4, 0, 0]}
+            />
+            <Bar
+              dataKey="expenses"
+              fill="#ef4444"
+              name="expenses"
+              radius={[4, 4, 0, 0]}
+            />
+            <Bar
+              dataKey="netProfit"
+              fill="#10b981"
+              name="netProfit"
               radius={[4, 4, 0, 0]}
             />
           </BarChart>
@@ -849,7 +1035,7 @@ const DashboardHome = () => {
         </Col>
       </Row>
 
-      {/* Profit Metrics */}
+      {/* Net Profit Metrics (Profit - Expenses) */}
       <Row gutter={[20, 20]}>
         <Col xs={24} sm={12} md={8}>
           <Card
@@ -864,23 +1050,25 @@ const DashboardHome = () => {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-white text-opacity-80 text-sm font-medium mb-2">
-                  দৈনিক লাভ
+                  দৈনিক নিট লাভ
                 </div>
                 <div className="text-2xl font-bold text-white mb-1">
-                  {dashboardData.dailyProfit?.toLocaleString()} ৳
+                  {dashboardData.dailyNetProfit?.toLocaleString()} ৳
                 </div>
                 <div className="text-white text-opacity-90 text-xs">
-                  আজকের মোট লাভ
+                  (লাভ - খরচ)
                 </div>
               </div>
               <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
                 <RiseOutlined className="text-2xl text-white" />
               </div>
             </div>
-            <div className="flex items-center mt-3">
-              <DollarCircleOutlined className="text-green-300 mr-1" />
-              <span className="text-green-300 text-sm font-medium">
-                বিক্রয়: {dashboardData.dailySales?.toLocaleString()} ৳
+            <div className="flex items-center justify-between mt-3 text-xs">
+              <span className="text-green-300">
+                লাভ: {dashboardData.dailyProfit?.toLocaleString()} ৳
+              </span>
+              <span className="text-red-300">
+                খরচ: {dashboardData.dailyExpenses?.toLocaleString()} ৳
               </span>
             </div>
           </Card>
@@ -899,23 +1087,25 @@ const DashboardHome = () => {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-white text-opacity-80 text-sm font-medium mb-2">
-                  মাসিক লাভ
+                  মাসিক নিট লাভ
                 </div>
                 <div className="text-2xl font-bold text-white mb-1">
-                  {dashboardData.monthlyProfit?.toLocaleString()} ৳
+                  {dashboardData.monthlyNetProfit?.toLocaleString()} ৳
                 </div>
                 <div className="text-white text-opacity-90 text-xs">
-                  এই মাসের মোট লাভ
+                  (লাভ - খরচ)
                 </div>
               </div>
               <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
                 <BarChartOutlined className="text-2xl text-white" />
               </div>
             </div>
-            <div className="flex items-center mt-3">
-              <DollarCircleOutlined className="text-pink-300 mr-1" />
-              <span className="text-pink-300 text-sm font-medium">
-                বিক্রয়: {dashboardData.monthlySales?.toLocaleString()} ৳
+            <div className="flex items-center justify-between mt-3 text-xs">
+              <span className="text-green-300">
+                লাভ: {dashboardData.monthlyProfit?.toLocaleString()} ৳
+              </span>
+              <span className="text-red-300">
+                খরচ: {dashboardData.monthlyExpenses?.toLocaleString()} ৳
               </span>
             </div>
           </Card>
@@ -934,23 +1124,133 @@ const DashboardHome = () => {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-white text-opacity-80 text-sm font-medium mb-2">
-                  বার্ষিক লাভ
+                  বার্ষিক নিট লাভ
                 </div>
                 <div className="text-2xl font-bold text-white mb-1">
-                  {dashboardData.yearlyProfit?.toLocaleString()} ৳
+                  {dashboardData.yearlyNetProfit?.toLocaleString()} ৳
                 </div>
                 <div className="text-white text-opacity-90 text-xs">
-                  এই বছরের মোট লাভ
+                  (লাভ - খরচ)
                 </div>
               </div>
               <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
                 <CalculatorOutlined className="text-2xl text-white" />
               </div>
             </div>
+            <div className="flex items-center justify-between mt-3 text-xs">
+              <span className="text-green-300">
+                লাভ: {dashboardData.yearlyProfit?.toLocaleString()} ৳
+              </span>
+              <span className="text-red-300">
+                খরচ: {dashboardData.yearlyExpenses?.toLocaleString()} ৳
+              </span>
+            </div>
+          </Card>
+        </Col>
+      </Row>
+
+      {/* Expense Metrics */}
+      <Row gutter={[20, 20]}>
+        <Col xs={24} sm={12} md={8}>
+          <Card
+            className="border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:-translate-y-1"
+            bodyStyle={{
+              background: cardColors.red,
+              borderRadius: "12px",
+              padding: "24px",
+              color: "white",
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-white text-opacity-80 text-sm font-medium mb-2">
+                  দৈনিক খরচ
+                </div>
+                <div className="text-2xl font-bold text-white mb-1">
+                  {dashboardData.dailyExpenses?.toLocaleString()} ৳
+                </div>
+                <div className="text-white text-opacity-90 text-xs">
+                  আজকের মোট খরচ
+                </div>
+              </div>
+              <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                <MoneyCollectOutlined className="text-2xl text-white" />
+              </div>
+            </div>
             <div className="flex items-center mt-3">
-              <ArrowUpOutlined className="text-orange-300 mr-1" />
-              <span className="text-orange-300 text-sm font-medium">
-                {new Date().getFullYear()} সালের লাভ
+              <FallOutlined className="text-red-300 mr-1" />
+              <span className="text-red-300 text-sm font-medium">
+                ব্যবসায়িক খরচ
+              </span>
+            </div>
+          </Card>
+        </Col>
+
+        <Col xs={24} sm={12} md={8}>
+          <Card
+            className="border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:-translate-y-1"
+            bodyStyle={{
+              background: cardColors.rose,
+              borderRadius: "12px",
+              padding: "24px",
+              color: "white",
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-white text-opacity-80 text-sm font-medium mb-2">
+                  মাসিক খরচ
+                </div>
+                <div className="text-2xl font-bold text-white mb-1">
+                  {dashboardData.monthlyExpenses?.toLocaleString()} ৳
+                </div>
+                <div className="text-white text-opacity-90 text-xs">
+                  এই মাসের মোট খরচ
+                </div>
+              </div>
+              <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                <MoneyCollectOutlined className="text-2xl text-white" />
+              </div>
+            </div>
+            <div className="flex items-center mt-3">
+              <FallOutlined className="text-red-300 mr-1" />
+              <span className="text-red-300 text-sm font-medium">
+                মাসিক ব্যবসায়িক খরচ
+              </span>
+            </div>
+          </Card>
+        </Col>
+
+        <Col xs={24} sm={12} md={8}>
+          <Card
+            className="border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:-translate-y-1"
+            bodyStyle={{
+              background: cardColors.indigo,
+              borderRadius: "12px",
+              padding: "24px",
+              color: "white",
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-white text-opacity-80 text-sm font-medium mb-2">
+                  বার্ষিক খরচ
+                </div>
+                <div className="text-2xl font-bold text-white mb-1">
+                  {dashboardData.yearlyExpenses?.toLocaleString()} ৳
+                </div>
+                <div className="text-white text-opacity-90 text-xs">
+                  এই বছরের মোট খরচ
+                </div>
+              </div>
+              <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                <MoneyCollectOutlined className="text-2xl text-white" />
+              </div>
+            </div>
+            <div className="flex items-center mt-3">
+              <FallOutlined className="text-indigo-300 mr-1" />
+              <span className="text-indigo-300 text-sm font-medium">
+                বার্ষিক ব্যবসায়িক খরচ
               </span>
             </div>
           </Card>
@@ -1346,11 +1646,11 @@ const DashboardHome = () => {
                 ব্যবহারকারী ব্যবস্থাপনা
               </Button>
               <Button
-                icon={<BarChartOutlined />}
-                className="w-full h-12 text-lg border-green-500 text-green-500 hover:bg-green-50 transition-all duration-300"
-                onClick={() => (window.location.href = "#/reports")}
+                icon={<MoneyCollectOutlined />}
+                className="w-full h-12 text-lg border-red-500 text-red-500 hover:bg-red-50 transition-all duration-300"
+                onClick={() => (window.location.href = "#/expenses")}
               >
-                স্টক রিপোর্ট
+                খরচ ব্যবস্থাপনা
               </Button>
             </div>
           </Card>
@@ -1362,7 +1662,7 @@ const DashboardHome = () => {
         title={
           <div className="flex items-center">
             <LineChartOutlined className="text-purple-600 mr-2" />
-            <span className="text-xl font-bold">বিক্রয় ও লাভ বিশ্লেষণ</span>
+            <span className="text-xl font-bold">বিক্রয়, লাভ ও খরচ বিশ্লেষণ</span>
           </div>
         }
         open={chartModalVisible}
@@ -1404,7 +1704,7 @@ const DashboardHome = () => {
 
           {/* Summary Cards */}
           <Row gutter={[16, 16]}>
-            <Col xs={24} sm={8}>
+            <Col xs={24} sm={6}>
               <Card className="text-center border-0 shadow-md">
                 <div className="text-blue-600 font-bold text-2xl">
                   {dashboardData.dailySales?.toLocaleString()} ৳
@@ -1412,20 +1712,31 @@ const DashboardHome = () => {
                 <div className="text-gray-600">দৈনিক বিক্রয়</div>
               </Card>
             </Col>
-            <Col xs={24} sm={8}>
+            <Col xs={24} sm={6}>
               <Card className="text-center border-0 shadow-md">
                 <div className="text-green-600 font-bold text-2xl">
-                  {dashboardData.monthlySales?.toLocaleString()} ৳
+                  {dashboardData.dailyNetProfit?.toLocaleString()} ৳
                 </div>
-                <div className="text-gray-600">মাসিক বিক্রয়</div>
+                <div className="text-gray-600">দৈনিক নিট লাভ</div>
               </Card>
             </Col>
-            <Col xs={24} sm={8}>
+            <Col xs={24} sm={6}>
+              <Card className="text-center border-0 shadow-md">
+                <div className="text-red-600 font-bold text-2xl">
+                  {dashboardData.dailyExpenses?.toLocaleString()} ৳
+                </div>
+                <div className="text-gray-600">দৈনিক খরচ</div>
+              </Card>
+            </Col>
+            <Col xs={24} sm={6}>
               <Card className="text-center border-0 shadow-md">
                 <div className="text-purple-600 font-bold text-2xl">
-                  {dashboardData.yearlyProfit?.toLocaleString()} ৳
+                  {Math.round(
+                    (dashboardData.monthlyNetProfit / dashboardData.monthlySales) *
+                      100
+                  ) || 0}%
                 </div>
-                <div className="text-gray-600">বার্ষিক লাভ</div>
+                <div className="text-gray-600">নিট লাভের হার</div>
               </Card>
             </Col>
           </Row>
@@ -1477,7 +1788,7 @@ const DashboardHome = () => {
           {/* Data Summary */}
           <Card title="ডেটা সারসংক্ষেপ" className="border-0 shadow-md">
             <Row gutter={[16, 16]}>
-              <Col xs={24} sm={8}>
+              <Col xs={24} sm={6}>
                 <div className="text-center p-4 bg-blue-50 rounded-lg">
                   <div className="text-blue-600 font-bold text-lg">
                     {dashboardData.totalOrders}
@@ -1485,7 +1796,7 @@ const DashboardHome = () => {
                   <div className="text-gray-600">মোট অর্ডার</div>
                 </div>
               </Col>
-              <Col xs={24} sm={8}>
+              <Col xs={24} sm={6}>
                 <div className="text-center p-4 bg-green-50 rounded-lg">
                   <div className="text-green-600 font-bold text-lg">
                     {dashboardData.totalProducts}
@@ -1493,17 +1804,23 @@ const DashboardHome = () => {
                   <div className="text-gray-600">মোট পণ্য</div>
                 </div>
               </Col>
-              <Col xs={24} sm={8}>
+              <Col xs={24} sm={6}>
+                <div className="text-center p-4 bg-red-50 rounded-lg">
+                  <div className="text-red-600 font-bold text-lg">
+                    {dashboardData.monthlyExpenses?.toLocaleString()} ৳
+                  </div>
+                  <div className="text-gray-600">মাসিক খরচ</div>
+                </div>
+              </Col>
+              <Col xs={24} sm={6}>
                 <div className="text-center p-4 bg-purple-50 rounded-lg">
                   <div className="text-purple-600 font-bold text-lg">
                     {Math.round(
-                      (dashboardData.monthlyProfit /
-                        dashboardData.monthlySales) *
+                      (dashboardData.monthlyNetProfit / dashboardData.monthlySales) *
                         100
-                    ) || 0}
-                    %
+                    ) || 0}%
                   </div>
-                  <div className="text-gray-600">লাভের হার</div>
+                  <div className="text-gray-600">নিট লাভের হার</div>
                 </div>
               </Col>
             </Row>

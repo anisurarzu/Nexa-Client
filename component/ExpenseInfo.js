@@ -73,28 +73,14 @@ const ExpenseInfo = () => {
 
   const userInfo = JSON.parse(localStorage.getItem("userInfo"));
 
-  // Categories and Products
-  const expenseCategories = [
-    "ফ্লাওয়ার কস্ট",
-    "ডেলিভারি চার্জ",
-    "প্যাকেজিং",
-    "মার্কেটিং",
-    "সরঞ্জাম",
-    "বেতন",
-    "ভাড়া",
-    "ইউটিলিটি",
-    "অন্যান্য",
-  ];
-
-  const products = [
-    "গোলাপ",
-    "অর্কিড",
-    "লিলি",
-    "সূর্যমুখী",
-    "কার্নেশন",
-    "বুকয়ে",
-    "গিফট",
-    "অন্যান্য",
+  // Updated Expense Names as per requirement
+  const expenseNames = [
+    "ঘর ভাড়া",
+    "বিদ্যুৎ বিল",
+    "কর্মচারী বেতন",
+    "মালকেরি বাবদ",
+    "দোকান খরচ",
+    "বিবিধ খরচ"
   ];
 
   // Bengali translations
@@ -109,16 +95,14 @@ const ExpenseInfo = () => {
     },
     filters: {
       search: "খরচের নাম বা কারণ অনুসন্ধান...",
-      category: "ক্যাটাগরি",
-      allCategories: "সব ক্যাটাগরি",
+      category: "খরচের নাম",
+      allCategories: "সব খরচ",
     },
     table: {
       date: "তারিখ",
       expenseName: "খরচের নাম",
       amount: "পরিমাণ",
       reason: "কারণ",
-      category: "ক্যাটাগরি",
-      product: "পণ্য",
       expenseBy: "খরচ করেছেন",
       actions: "কর্ম",
     },
@@ -126,15 +110,11 @@ const ExpenseInfo = () => {
       createTitle: "নতুন খরচ যোগ করুন",
       editTitle: "খরচ সম্পাদনা করুন",
       expenseName: "খরচের নাম *",
-      expenseNamePlaceholder: "খরচের নাম লিখুন",
+      expenseNamePlaceholder: "খরচের নাম নির্বাচন করুন",
       amount: "পরিমাণ *",
       amountPlaceholder: "০.০০",
-      reason: "কারণ *",
+      reason: "কারণ ",
       reasonPlaceholder: "খরচের কারণ লিখুন",
-      category: "ক্যাটাগরি *",
-      categoryPlaceholder: "ক্যাটাগরি নির্বাচন করুন",
-      product: "পণ্য",
-      productPlaceholder: "পণ্য নির্বাচন করুন (ঐচ্ছিক)",
       expenseDate: "খরচের তারিখ *",
       expenseBy: "খরচ করেছেন *",
       expenseByPlaceholder: "আপনার নাম",
@@ -218,8 +198,6 @@ const ExpenseInfo = () => {
       expenseName: "",
       amount: 0,
       reason: "",
-      category: "",
-      product: "",
       expenseDate: dayjs().format("YYYY-MM-DD"),
       expenseBy: userInfo?.loginID || "",
     },
@@ -229,6 +207,7 @@ const ExpenseInfo = () => {
 
         const expenseData = {
           ...values,
+          reason:values?.reason||" n/a reason",
           amount: Number(values.amount),
           createdBy: userInfo?.loginID,
           createdDate: dayjs().format("YYYY-MM-DD HH:mm:ss"),
@@ -266,9 +245,7 @@ const ExpenseInfo = () => {
     formik.setValues({
       expenseName: record.expenseName,
       amount: record.amount,
-      reason: record.reason,
-      category: record.category,
-      product: record.product || "",
+      reason: record.reason||" n/a reason",
       expenseDate: record.expenseDate,
       expenseBy: record.expenseBy,
     });
@@ -321,7 +298,7 @@ const ExpenseInfo = () => {
 
     // Category filter
     if (category !== "all") {
-      filtered = filtered.filter((item) => item.category === category);
+      filtered = filtered.filter((item) => item.expenseName === category);
     }
 
     setFilteredExpenses(filtered);
@@ -382,28 +359,6 @@ const ExpenseInfo = () => {
       render: (text) => (
         <Text type="secondary" className="text-sm">
           {text}
-        </Text>
-      ),
-    },
-    {
-      title: bengaliText.table.category,
-      dataIndex: "category",
-      key: "category",
-      width: 130,
-      render: (text) => (
-        <Tag color="blue" className="text-xs">
-          {text}
-        </Tag>
-      ),
-    },
-    {
-      title: bengaliText.table.product,
-      dataIndex: "product",
-      key: "product",
-      width: 120,
-      render: (text) => (
-        <Text type="secondary" className="text-xs">
-          {text || "-"}
         </Text>
       ),
     },
@@ -470,14 +425,19 @@ const ExpenseInfo = () => {
                 : ""
             }
           >
-            <Input
+            <Select
               name="expenseName"
               value={formik.values.expenseName}
-              onChange={formik.handleChange}
-              onBlur={formik.handleBlur}
+              onChange={(value) => formik.setFieldValue("expenseName", value)}
               placeholder={bengaliText.form.expenseNamePlaceholder}
               size="large"
-            />
+            >
+              {expenseNames.map((name) => (
+                <Option key={name} value={name}>
+                  {name}
+                </Option>
+              ))}
+            </Select>
           </Form.Item>
         </Col>
         <Col span={12}>
@@ -508,44 +468,6 @@ const ExpenseInfo = () => {
           rows={3}
         />
       </Form.Item>
-
-      <Row gutter={16}>
-        <Col span={12}>
-          <Form.Item label={bengaliText.form.category} required>
-            <Select
-              name="category"
-              value={formik.values.category}
-              onChange={(value) => formik.setFieldValue("category", value)}
-              placeholder={bengaliText.form.categoryPlaceholder}
-              size="large"
-            >
-              {expenseCategories.map((cat) => (
-                <Option key={cat} value={cat}>
-                  {cat}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
-        </Col>
-        <Col span={12}>
-          <Form.Item label={bengaliText.form.product}>
-            <Select
-              name="product"
-              value={formik.values.product}
-              onChange={(value) => formik.setFieldValue("product", value)}
-              placeholder={bengaliText.form.productPlaceholder}
-              size="large"
-              allowClear
-            >
-              {products.map((product) => (
-                <Option key={product} value={product}>
-                  {product}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
-        </Col>
-      </Row>
 
       <Row gutter={16}>
         <Col span={12}>
@@ -703,9 +625,9 @@ const ExpenseInfo = () => {
             placeholder={bengaliText.filters.category}
           >
             <Option value="all">{bengaliText.filters.allCategories}</Option>
-            {expenseCategories.map((cat) => (
-              <Option key={cat} value={cat}>
-                {cat}
+            {expenseNames.map((name) => (
+              <Option key={name} value={name}>
+                {name}
               </Option>
             ))}
           </Select>
@@ -727,7 +649,7 @@ const ExpenseInfo = () => {
             pageSizeOptions: ["10", "20", "50"],
           }}
           loading={loading}
-          scroll={{ x: 1000 }}
+          scroll={{ x: 800 }}
         />
       </Card>
 
