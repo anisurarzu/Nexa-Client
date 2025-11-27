@@ -754,6 +754,7 @@ const OrderEntry = () => {
 
   // Edit Order - সম্পূর্ণ অর্ডার এডিট করার ফাংশন
   const editOrder = (order) => {
+    console.log('order',order)
     setSelectedOrder(order);
     editOrderForm.setFieldsValue({
       productName: order.productName,
@@ -799,6 +800,8 @@ const OrderEntry = () => {
       } else if (paidAmount === totalAmount) {
         paymentMethod = "Cash";
       }
+
+      console.log('values',values)
 
       const updateData = {
         ...values,
@@ -1571,6 +1574,7 @@ const OrderEntry = () => {
                       min={1}
                       formatter={(value) => `৳ ${value}`}
                       parser={(value) => value.replace(/৳\s?/g, "")}
+                          onChange={() => handleAmountChange(editOrderForm)}
                       size="large"
                     />
                   </Form.Item>
