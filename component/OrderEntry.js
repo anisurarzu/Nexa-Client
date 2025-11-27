@@ -290,6 +290,7 @@ const OrderEntry = () => {
           availableQuantity: productData.quantity || 100,
           orderDate: dayjs(),
           paymentMethod: "Cash",
+          paidAmount: 0,
         });
 
         // Calculate totalAmount and dueAmount after setting form values
@@ -328,20 +329,87 @@ const OrderEntry = () => {
   };
 
   // Handle paid amount change
-  const handlePaidAmountChange = (form) => {
+  const handlePaidAmountChange = (value, form) => {
+    if (value === null || value === undefined) return;
+    
     const totalAmount = form.getFieldValue("totalAmount") || 0;
-    const paidAmount = form.getFieldValue("paidAmount") || 0;
-    const dueAmount = Math.max(0, totalAmount - paidAmount);
+    const dueAmount = Math.max(0, totalAmount - value);
     
     form.setFieldsValue({
+      paidAmount: value,
       dueAmount: dueAmount
     });
+  };
+
+  // Quantity validator to ensure it doesn't exceed available quantity
+  const validateQuantity = (_, value) => {
+    const availableQuantity =
+      addOrderForm.getFieldValue("availableQuantity") ||
+      scanForm.getFieldValue("availableQuantity") ||
+      100;
+
+    if (value && value > availableQuantity) {
+      return Promise.reject(
+        new Error(`পরিমাণ ${availableQuantity} এর বেশি হতে পারবে না`)
+      );
+    }
+    if (value && value < 1) {
+      return Promise.reject(new Error("পরিমাণ ১ এর কম হতে পারবে না"));
+    }
+    return Promise.resolve();
+  };
+
+  // Paid amount validator
+  const validatePaidAmount = (_, value) => {
+    const totalAmount = 
+      addOrderForm.getFieldValue("totalAmount") || 
+      scanForm.getFieldValue("totalAmount") || 
+      editOrderForm.getFieldValue("totalAmount") || 
+      0;
+
+    if (value && value > totalAmount) {
+      return Promise.reject(
+        new Error(`পরিশোধিত Amount মোট Amount (৳${totalAmount}) এর বেশি হতে পারবে না`)
+      );
+    }
+    if (value && value < 0) {
+      return Promise.reject(new Error("পরিশোধিত Amount ০ এর কম হতে পারবে না"));
+    }
+    return Promise.resolve();
   };
 
   const startQRScanner = () => {
     setScanModalVisible(true);
     setScanning(true);
     setCameraError(false);
+  };
+
+  // Debug function to check API response
+  const debugOrderCreation = async (orderData) => {
+    console.log("🔄 Sending payload to backend:", orderData);
+    
+    try {
+      const response = await coreAxios.post("/productOrders", orderData);
+      console.log("✅ Backend response:", response.data);
+      
+      if (response.data.success) {
+        console.log("📊 Data comparison:", {
+          sent: {
+            paidAmount: orderData.paidAmount,
+            dueAmount: orderData.dueAmount
+          },
+          received: {
+            paidAmount: response.data.data.paidAmount,
+            dueAmount: response.data.data.dueAmount
+          }
+        });
+      }
+      
+      return response;
+    } catch (error) {
+      console.error("❌ API Error:", error);
+      throw error;
+    }
   };
 
   const handleAddOrder = async (values) => {
@@ -357,7 +425,23 @@ const OrderEntry = () => {
     const salePrice = values.salePrice || 0;
     const totalAmount = quantity * salePrice;
     const paidAmount = values.paidAmount || 0;
-    const dueAmount = totalAmount - paidAmount;
+    const dueAmount = Math.max(0, totalAmount - paidAmount);
+
+    // Validate paid amount doesn't exceed total
+    if (paidAmount > totalAmount) {
+      message.error("পরিশোধিত Amount মোট Amount এর বেশি হতে পারবে না!");
+      return;
+    }
+
+    // Auto update payment method based on paid amount
+    let paymentMethod = values.paymentMethod || "Cash";
+    if (paidAmount === 0) {
+      paymentMethod = "Due";
+    } else if (paidAmount > 0 && paidAmount < totalAmount) {
+      paymentMethod = "Partial";
+    } else if (paidAmount === totalAmount) {
+      paymentMethod = "Cash";
+    }
 
     // Create order immediately when adding product
     const orderData = {
@@ -373,9 +457,9 @@ const OrderEntry = () => {
       customerAddress: values.customerAddress || "N/A",
       totalAmount: totalAmount,
       grandTotal: totalAmount,
-      paymentMethod: values.paymentMethod || "Cash",
+      paymentMethod: paymentMethod,
       paidAmount: paidAmount,
-      dueAmount: Math.max(0, dueAmount),
+      dueAmount: dueAmount,
       createdBy: currentUser,
       status: "Pending",
       orderDate: values.orderDate
@@ -387,38 +471,87 @@ const OrderEntry = () => {
 
     setOrderSubmitting(true);
     try {
-      const response = await coreAxios.post("/productOrders", orderData);
+      // Use debug function to see what's happening
+      const response = await debugOrderCreation(orderData);
 
       if (response.data.success) {
-        message.success({
-          content: (
-            <div>
-              <CheckCircleOutlined
-                style={{ color: "#52c41a", marginRight: 8 }}
-              />
-              অর্ডার সফলভাবে তৈরি হয়েছে!
-              <br />
-              <Text type="secondary" style={{ fontSize: "12px" }}>
-                অর্ডার নম্বর: {response.data.data.orderNo}
-              </Text>
-              <br />
-              <Text type="secondary" style={{ fontSize: "12px" }}>
-                তৈরি করেছেন: {currentUser}
-              </Text>
-              <br />
-              <Text type="secondary" style={{ fontSize: "12px" }}>
-                অর্ডার তারিখ: {dayjs(orderData.orderDate).format("DD/MM/YYYY")}
-              </Text>
-              <br />
-              {dueAmount > 0 && (
-                <Text type="warning" style={{ fontSize: "12px" }}>
-                  বাকি আছে: ৳{dueAmount}
+        const createdOrder = response.data.data;
+        
+        // Check if backend overrode our paidAmount and dueAmount values
+        if (createdOrder.paidAmount !== paidAmount || createdOrder.dueAmount !== dueAmount) {
+          console.warn("Backend overrode payment values. Attempting to update...");
+          
+          // If backend overrode, update immediately with correct values
+          try {
+            const updateResponse = await coreAxios.put(`/productOrders/${createdOrder._id}`, {
+              paidAmount: paidAmount,
+              dueAmount: dueAmount,
+              paymentMethod: paymentMethod,
+              updatedBy: currentUser
+            });
+            
+            if (updateResponse.data.success) {
+              message.success({
+                content: (
+                  <div>
+                    <CheckCircleOutlined style={{ color: "#52c41a", marginRight: 8 }} />
+                    অর্ডার সফলভাবে তৈরি এবং আপডেট হয়েছে!
+                    <br />
+                    <Text type="secondary" style={{ fontSize: "12px" }}>
+                      অর্ডার নম্বর: {createdOrder.orderNo}
+                    </Text>
+                    <br />
+                    <Text type="success" style={{ fontSize: "12px" }}>
+                      পরিশোধিত: ৳{paidAmount}
+                    </Text>
+                    <br />
+                    {dueAmount > 0 ? (
+                      <Text type="warning" style={{ fontSize: "12px" }}>
+                        বাকি আছে: ৳{dueAmount}
+                      </Text>
+                    ) : (
+                      <Text type="success" style={{ fontSize: "12px" }}>
+                        সম্পূর্ণ পরিশোধিত
+                      </Text>
+                    )}
+                  </div>
+                ),
+                duration: 5,
+              });
+            }
+          } catch (updateError) {
+            console.error("Error updating order:", updateError);
+            message.warning("অর্ডার তৈরি হয়েছে কিন্তু পরিশোধিত Amount সঠিকভাবে সেট করতে ব্যর্থ হয়েছে!");
+          }
+        } else {
+          message.success({
+            content: (
+              <div>
+                <CheckCircleOutlined style={{ color: "#52c41a", marginRight: 8 }} />
+                অর্ডার সফলভাবে তৈরি হয়েছে!
+                <br />
+                <Text type="secondary" style={{ fontSize: "12px" }}>
+                  অর্ডার নম্বর: {createdOrder.orderNo}
                 </Text>
-              )}
-            </div>
-          ),
-          duration: 5,
-        });
+                <br />
+                <Text type="success" style={{ fontSize: "12px" }}>
+                  পরিশোধিত: ৳{paidAmount}
+                </Text>
+                <br />
+                {dueAmount > 0 ? (
+                  <Text type="warning" style={{ fontSize: "12px" }}>
+                    বাকি আছে: ৳{dueAmount}
+                  </Text>
+                ) : (
+                  <Text type="success" style={{ fontSize: "12px" }}>
+                    সম্পূর্ণ পরিশোধিত
+                  </Text>
+                )}
+              </div>
+            ),
+            duration: 5,
+          });
+        }
 
         // Reset and refresh data
         setCustomerInfo({ name: "", phone: "", address: "" });
@@ -454,7 +587,23 @@ const OrderEntry = () => {
     const salePrice = values.salePrice || 0;
     const totalAmount = quantity * salePrice;
     const paidAmount = values.paidAmount || 0;
-    const dueAmount = totalAmount - paidAmount;
+    const dueAmount = Math.max(0, totalAmount - paidAmount);
+
+    // Validate paid amount doesn't exceed total
+    if (paidAmount > totalAmount) {
+      message.error("পরিশোধিত Amount মোট Amount এর বেশি হতে পারবে না!");
+      return;
+    }
+
+    // Auto update payment method based on paid amount
+    let paymentMethod = values.paymentMethod || "Cash";
+    if (paidAmount === 0) {
+      paymentMethod = "Due";
+    } else if (paidAmount > 0 && paidAmount < totalAmount) {
+      paymentMethod = "Partial";
+    } else if (paidAmount === totalAmount) {
+      paymentMethod = "Cash";
+    }
 
     // Create order immediately when scanning product
     const orderData = {
@@ -470,9 +619,9 @@ const OrderEntry = () => {
       customerAddress: values.customerAddress || "N/A",
       totalAmount: totalAmount,
       grandTotal: totalAmount,
-      paymentMethod: values.paymentMethod || "Cash",
+      paymentMethod: paymentMethod,
       paidAmount: paidAmount,
-      dueAmount: Math.max(0, dueAmount),
+      dueAmount: dueAmount,
       createdBy: currentUser,
       status: "Pending",
       orderDate: values.orderDate
@@ -484,32 +633,49 @@ const OrderEntry = () => {
 
     setOrderSubmitting(true);
     try {
-      const response = await coreAxios.post("/productOrders", orderData);
+      const response = await debugOrderCreation(orderData);
 
       if (response.data.success) {
+        const createdOrder = response.data.data;
+        
+        // Check if backend overrode our paidAmount and dueAmount values
+        if (createdOrder.paidAmount !== paidAmount || createdOrder.dueAmount !== dueAmount) {
+          console.warn("Backend overrode payment values. Attempting to update...");
+          
+          // If backend overrode, update immediately with correct values
+          try {
+            await coreAxios.put(`/productOrders/${createdOrder._id}`, {
+              paidAmount: paidAmount,
+              dueAmount: dueAmount,
+              paymentMethod: paymentMethod,
+              updatedBy: currentUser
+            });
+          } catch (updateError) {
+            console.error("Error updating order:", updateError);
+          }
+        }
+
         message.success({
           content: (
             <div>
-              <CheckCircleOutlined
-                style={{ color: "#52c41a", marginRight: 8 }}
-              />
+              <CheckCircleOutlined style={{ color: "#52c41a", marginRight: 8 }} />
               অর্ডার সফলভাবে তৈরি হয়েছে!
               <br />
               <Text type="secondary" style={{ fontSize: "12px" }}>
-                অর্ডার নম্বর: {response.data.data.orderNo}
+                অর্ডার নম্বর: {createdOrder.orderNo}
               </Text>
               <br />
-              <Text type="secondary" style={{ fontSize: "12px" }}>
-                তৈরি করেছেন: {currentUser}
+              <Text type="success" style={{ fontSize: "12px" }}>
+                পরিশোধিত: ৳{paidAmount}
               </Text>
               <br />
-              <Text type="secondary" style={{ fontSize: "12px" }}>
-                অর্ডার তারিখ: {dayjs(orderData.orderDate).format("DD/MM/YYYY")}
-              </Text>
-              <br />
-              {dueAmount > 0 && (
+              {dueAmount > 0 ? (
                 <Text type="warning" style={{ fontSize: "12px" }}>
                   বাকি আছে: ৳{dueAmount}
+                </Text>
+              ) : (
+                <Text type="success" style={{ fontSize: "12px" }}>
+                  সম্পূর্ণ পরিশোধিত
                 </Text>
               )}
             </div>
@@ -552,29 +718,12 @@ const OrderEntry = () => {
         availableQuantity: selectedProduct.quantity || 100,
         orderDate: dayjs(),
         paymentMethod: "Cash",
+        paidAmount: 0,
       });
 
       // Calculate totalAmount and dueAmount after setting form values
       calculateTotalAndDueAmount(addOrderForm);
     }
-  };
-
-  // Quantity validator to ensure it doesn't exceed available quantity
-  const validateQuantity = (_, value) => {
-    const availableQuantity =
-      addOrderForm.getFieldValue("availableQuantity") ||
-      scanForm.getFieldValue("availableQuantity") ||
-      100;
-
-    if (value && value > availableQuantity) {
-      return Promise.reject(
-        new Error(`পরিমাণ ${availableQuantity} এর বেশি হতে পারবে না`)
-      );
-    }
-    if (value && value < 1) {
-      return Promise.reject(new Error("পরিমাণ ১ এর কম হতে পারবে না"));
-    }
-    return Promise.resolve();
   };
 
   // View Order Details
@@ -633,7 +782,23 @@ const OrderEntry = () => {
       const salePrice = values.salePrice || 0;
       const totalAmount = quantity * salePrice;
       const paidAmount = values.paidAmount || 0;
-      const dueAmount = totalAmount - paidAmount;
+      const dueAmount = Math.max(0, totalAmount - paidAmount);
+
+      // Validate paid amount doesn't exceed total
+      if (paidAmount > totalAmount) {
+        message.error("পরিশোধিত Amount মোট Amount এর বেশি হতে পারবে না!");
+        return;
+      }
+
+      // Auto update payment method based on paid amount
+      let paymentMethod = values.paymentMethod || "Cash";
+      if (paidAmount === 0) {
+        paymentMethod = "Due";
+      } else if (paidAmount > 0 && paidAmount < totalAmount) {
+        paymentMethod = "Partial";
+      } else if (paidAmount === totalAmount) {
+        paymentMethod = "Cash";
+      }
 
       const updateData = {
         ...values,
@@ -641,12 +806,15 @@ const OrderEntry = () => {
         grandTotal: totalAmount,
         totalAmount: totalAmount,
         paidAmount: paidAmount,
-        dueAmount: Math.max(0, dueAmount),
+        dueAmount: dueAmount,
+        paymentMethod: paymentMethod,
         updatedBy: currentUser,
         orderDate: values.orderDate
           ? values.orderDate.toISOString()
           : new Date().toISOString(),
       };
+
+      console.log("Update Data:", updateData);
 
       const response = await coreAxios.put(
         `/productOrders/${selectedOrder._id}`,
@@ -746,6 +914,16 @@ const OrderEntry = () => {
       render: (amount) => <Text strong>৳{amount}</Text>,
     },
     {
+      title: "পরিশোধিত",
+      dataIndex: "paidAmount",
+      key: "paidAmount",
+      render: (paidAmount, record) => (
+        <Text type="success" strong>
+          ৳{paidAmount || 0}
+        </Text>
+      ),
+    },
+    {
       title: "বাকি",
       dataIndex: "dueAmount",
       key: "dueAmount",
@@ -754,6 +932,18 @@ const OrderEntry = () => {
           ৳{dueAmount || 0}
         </Text>
       ),
+    },
+    {
+      title: "পেমেন্ট মেথড",
+      dataIndex: "paymentMethod",
+      key: "paymentMethod",
+      render: (method) => {
+        let color = "blue";
+        if (method === "Due") color = "red";
+        if (method === "Partial") color = "orange";
+        if (method === "Cash") color = "green";
+        return <Tag color={color}>{method}</Tag>;
+      },
     },
     {
       title: "অর্ডার তারিখ",
@@ -780,8 +970,7 @@ const OrderEntry = () => {
             className="cursor-pointer"
             onClick={() => handleStatusChange(record._id, status)}
           >
-            <p>{status}</p>
-            <p>{record?.createdBy}</p>
+            {status}
           </Tag>
         </Tooltip>
       ),
@@ -1112,6 +1301,9 @@ const OrderEntry = () => {
                     <Form.Item
                       name="paidAmount"
                       label="পরিশোধিত Amount"
+                      rules={[
+                        { validator: validatePaidAmount }
+                      ]}
                     >
                       <InputNumber
                         className="w-full"
@@ -1119,7 +1311,7 @@ const OrderEntry = () => {
                         formatter={(value) => `৳ ${value}`}
                         parser={(value) => value.replace(/৳\s?/g, "")}
                         size="large"
-                        onChange={() => handlePaidAmountChange(addOrderForm)}
+                        onChange={(value) => handlePaidAmountChange(value, addOrderForm)}
                       />
                     </Form.Item>
                   </Col>
@@ -1434,6 +1626,9 @@ const OrderEntry = () => {
                     <Form.Item
                       name="paidAmount"
                       label="পরিশোধিত Amount"
+                      rules={[
+                        { validator: validatePaidAmount }
+                      ]}
                     >
                       <InputNumber
                         className="w-full"
@@ -1441,7 +1636,7 @@ const OrderEntry = () => {
                         formatter={(value) => `৳ ${value}`}
                         parser={(value) => value.replace(/৳\s?/g, "")}
                         size="large"
-                        onChange={() => handlePaidAmountChange(editOrderForm)}
+                        onChange={(value) => handlePaidAmountChange(value, editOrderForm)}
                       />
                     </Form.Item>
                   </Col>
@@ -1715,6 +1910,9 @@ const OrderEntry = () => {
                       <Form.Item
                         name="paidAmount"
                         label="পরিশোধিত Amount"
+                        rules={[
+                          { validator: validatePaidAmount }
+                        ]}
                       >
                         <InputNumber
                           className="w-full"
@@ -1722,7 +1920,7 @@ const OrderEntry = () => {
                           formatter={(value) => `৳ ${value}`}
                           parser={(value) => value.replace(/৳\s?/g, "")}
                           size="large"
-                          onChange={() => handlePaidAmountChange(scanForm)}
+                          onChange={(value) => handlePaidAmountChange(value, scanForm)}
                         />
                       </Form.Item>
                     </Col>
