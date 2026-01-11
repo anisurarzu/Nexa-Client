@@ -16,6 +16,7 @@ import {
   Modal,
   Tabs,
   Select,
+  Alert,
 } from "antd";
 import {
   BoxPlotOutlined,
@@ -46,6 +47,8 @@ import {
   FileTextOutlined,
   StockOutlined,
   ThunderboltOutlined,
+  StopOutlined,
+  ExclamationCircleOutlined,
 } from "@ant-design/icons";
 import { useState, useEffect } from "react";
 import coreAxios from "@/utils/axiosInstance";
@@ -847,6 +850,24 @@ const DashboardHome = () => {
     }
   };
 
+  // Check current date for server bill payment reminder
+  const getCurrentDateInfo = () => {
+    const today = new Date();
+    const currentDay = today.getDate();
+    const currentMonth = today.toLocaleDateString('bn-BD', { month: 'long' });
+    const currentYear = today.getFullYear();
+    
+    return {
+      day: currentDay,
+      month: currentMonth,
+      year: currentYear,
+      isWarningPeriod: currentDay >= 10 && currentDay <= 15,
+      isBlocked: currentDay > 15,
+    };
+  };
+
+  const dateInfo = getCurrentDateInfo();
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -864,8 +885,89 @@ const DashboardHome = () => {
     );
   }
 
+  // Block access after 10th if bill not paid
+  if (dateInfo.isBlocked) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="max-w-2xl w-full border-0 shadow-2xl">
+          <div className="text-center py-8">
+            <div className="mb-6">
+              <StopOutlined className="text-6xl text-red-500 mb-4" />
+            </div>
+            <Alert
+              message={
+                <div className="text-center">
+                  <Typography.Title level={3} className="text-red-600 mb-2">
+                    <ExclamationCircleOutlined className="mr-2" />
+                    সার্ভার বিল পরিশোধ করুন
+                  </Typography.Title>
+                  <Typography.Text className="text-lg block mb-4">
+                    দুঃখিত, আপনার সার্ভার বিল পরিশোধ করা হয়নি
+                  </Typography.Text>
+                  <Typography.Text className="text-base text-gray-600 block">
+                    ড্যাশবোর্ড অ্যাক্সেস করতে হলে প্রথমে সার্ভার বিল পরিশোধ করুন
+                  </Typography.Text>
+                  <Typography.Text className="text-sm text-gray-500 block mt-4">
+                    তারিখ: {dateInfo.day} {dateInfo.month}, {dateInfo.year}
+                  </Typography.Text>
+                </div>
+              }
+              type="error"
+              showIcon={false}
+              className="border-2 border-red-300 rounded-xl"
+              style={{
+                backgroundColor: '#fef2f2',
+                padding: '30px',
+              }}
+            />
+            <div className="mt-6">
+              <Button
+                type="primary"
+                size="large"
+                icon={<WalletOutlined />}
+                className="bg-gradient-to-r from-red-500 to-red-600 border-0 shadow-lg hover:shadow-xl"
+                onClick={() => window.location.reload()}
+              >
+                পৃষ্ঠা রিফ্রেশ করুন
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      {/* Server Bill Payment Warning (1-10 of month) */}
+      {dateInfo.isWarningPeriod && (
+        <Alert
+          message={
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <WarningOutlined className="text-2xl text-orange-500 mr-3" />
+                <div>
+                  <Typography.Text strong className="text-base block">
+                    সার্ভার বিল পরিশোধের সময়
+                  </Typography.Text>
+                  <Typography.Text className="text-sm text-gray-700">
+                    অনুগ্রহ করে {dateInfo.month} মাসের সার্ভার বিলের বাকি পরিমাণ পরিশোধ করুন। 
+                    {dateInfo.day < 15 ? ` এখনও ${15 - dateInfo.day} দিন বাকি আছে।` : ' আজই পরিশোধ করুন।'}
+                  </Typography.Text>
+                </div>
+              </div>
+            </div>
+          }
+          type="warning"
+          showIcon={false}
+          className="border-2 border-orange-300 rounded-xl shadow-lg"
+          style={{
+            backgroundColor: '#fff7ed',
+            padding: '20px',
+          }}
+          closable
+        />
+      )}
       {/* Header with Refresh Button */}
       <div className="flex justify-between items-center">
         <div>
