@@ -37,6 +37,15 @@ import {
   LineChartOutlined,
   AreaChartOutlined,
   MoneyCollectOutlined,
+  AppstoreOutlined,
+  DatabaseOutlined,
+  TrophyOutlined,
+  CalendarOutlined,
+  WalletOutlined,
+  BankOutlined,
+  FileTextOutlined,
+  StockOutlined,
+  ThunderboltOutlined,
 } from "@ant-design/icons";
 import { useState, useEffect } from "react";
 import coreAxios from "@/utils/axiosInstance";
@@ -883,106 +892,118 @@ const DashboardHome = () => {
       </div>
 
       {/* Main Metrics */}
-      <Row gutter={[20, 20]}>
-        <Col xs={24} sm={12} lg={6}>
+      <Row gutter={[16, 16]}>
+        <Col xs={24} sm={12} md={12} lg={6} xl={6}>
           <Card
-            className="border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:-translate-y-1"
+            className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 h-full"
             bodyStyle={{
-              background: cardColors.green,
-              borderRadius: "12px",
+              background: `linear-gradient(135deg, ${cardColors.green} 0%, #059669 100%)`,
+              borderRadius: "16px",
               padding: "24px",
               color: "white",
+              minHeight: "160px",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
             }}
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-white text-opacity-80 text-sm font-medium mb-2">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="text-white text-opacity-90 text-xs font-semibold mb-2 uppercase tracking-wide">
                   মোট পণ্য
                 </div>
-                <div className="text-3xl font-bold text-white mb-1">
+                <div className="text-3xl font-extrabold text-white mb-1">
                   {dashboardData.totalProducts}
                 </div>
-                <div className="text-white text-opacity-90 text-xs">
+                <div className="text-white text-opacity-80 text-xs font-medium">
                   সকল পণ্য
                 </div>
               </div>
-              <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                <BoxPlotOutlined className="text-2xl text-white" />
+              <div className="w-14 h-14 bg-white bg-opacity-25 rounded-xl flex items-center justify-center shadow-lg ml-3 flex-shrink-0">
+                <AppstoreOutlined className="text-2xl text-white" />
               </div>
             </div>
-            <div className="flex items-center mt-3">
-              <ArrowUpOutlined className="text-green-300 mr-1" />
-              <span className="text-green-300 text-sm font-medium">
+            <div className="flex items-center mt-4 pt-3 border-t border-white border-opacity-20">
+              <ArrowUpOutlined className="text-green-200 mr-2 text-sm" />
+              <span className="text-white text-xs font-medium">
                 +15% এই মাসে
               </span>
             </div>
           </Card>
         </Col>
 
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} md={12} lg={6} xl={6}>
           <Card
-            className="border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:-translate-y-1"
+            className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 h-full"
             bodyStyle={{
-              background: cardColors.gold,
-              borderRadius: "12px",
+              background: `linear-gradient(135deg, ${cardColors.gold} 0%, #d97706 100%)`,
+              borderRadius: "16px",
               padding: "24px",
               color: "white",
+              minHeight: "160px",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
             }}
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-white text-opacity-80 text-sm font-medium mb-2">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="text-white text-opacity-90 text-xs font-semibold mb-2 uppercase tracking-wide">
                   মোট স্টক মূল্য
                 </div>
-                <div className="text-2xl font-bold text-white mb-1">
+                <div className="text-2xl font-extrabold text-white mb-1">
                   {dashboardData.totalStockValue?.toLocaleString()} ৳
                 </div>
-                <div className="text-white text-opacity-90 text-xs">
+                <div className="text-white text-opacity-80 text-xs font-medium">
                   সকল পণ্যের মূল্য
                 </div>
               </div>
-              <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                <CalculatorOutlined className="text-2xl text-white" />
+              <div className="w-14 h-14 bg-white bg-opacity-25 rounded-xl flex items-center justify-center shadow-lg ml-3 flex-shrink-0">
+                <DatabaseOutlined className="text-2xl text-white" />
               </div>
             </div>
-            <div className="flex items-center mt-3">
-              <DollarCircleOutlined className="text-yellow-300 mr-1" />
-              <span className="text-yellow-300 text-sm font-medium">
+            <div className="flex items-center mt-4 pt-3 border-t border-white border-opacity-20">
+              <DollarCircleOutlined className="text-yellow-200 mr-2 text-sm" />
+              <span className="text-white text-xs font-medium">
                 {dashboardData.totalStockQuantity?.toLocaleString()} ইউনিট
               </span>
             </div>
           </Card>
         </Col>
 
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} md={12} lg={6} xl={6}>
           <Card
-            className="border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:-translate-y-1"
+            className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 h-full"
             bodyStyle={{
-              background: cardColors.blue,
-              borderRadius: "12px",
+              background: `linear-gradient(135deg, ${cardColors.blue} 0%, #2563eb 100%)`,
+              borderRadius: "16px",
               padding: "24px",
               color: "white",
+              minHeight: "160px",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
             }}
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-white text-opacity-80 text-sm font-medium mb-2">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="text-white text-opacity-90 text-xs font-semibold mb-2 uppercase tracking-wide">
                   মাসিক বিক্রয়
                 </div>
-                <div className="text-2xl font-bold text-white mb-1">
+                <div className="text-2xl font-extrabold text-white mb-1">
                   {dashboardData.monthlySales?.toLocaleString()} ৳
                 </div>
-                <div className="text-white text-opacity-90 text-xs">
+                <div className="text-white text-opacity-80 text-xs font-medium">
                   মাসিক রাজস্ব
                 </div>
               </div>
-              <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                <DollarCircleOutlined className="text-2xl text-white" />
+              <div className="w-14 h-14 bg-white bg-opacity-25 rounded-xl flex items-center justify-center shadow-lg ml-3 flex-shrink-0">
+                <TrophyOutlined className="text-2xl text-white" />
               </div>
             </div>
-            <div className="flex items-center mt-3">
-              <ArrowUpOutlined className="text-green-300 mr-1" />
-              <span className="text-green-300 text-sm font-medium">
+            <div className="flex items-center mt-4 pt-3 border-t border-white border-opacity-20">
+              <ArrowUpOutlined className="text-blue-200 mr-2 text-sm" />
+              <span className="text-white text-xs font-medium">
                 {dashboardData.totalOrders > 0
                   ? `মোট ${dashboardData.totalOrders} অর্ডার`
                   : "কোন ডেটা নেই"}
@@ -991,33 +1012,37 @@ const DashboardHome = () => {
           </Card>
         </Col>
 
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} md={12} lg={6} xl={6}>
           <Card
-            className="border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:-translate-y-1"
+            className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 h-full"
             bodyStyle={{
-              background: cardColors.purple,
-              borderRadius: "12px",
+              background: `linear-gradient(135deg, ${cardColors.purple} 0%, #7c3aed 100%)`,
+              borderRadius: "16px",
               padding: "24px",
               color: "white",
+              minHeight: "160px",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
             }}
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-white text-opacity-80 text-sm font-medium mb-2">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="text-white text-opacity-90 text-xs font-semibold mb-2 uppercase tracking-wide">
                   অপেক্ষমাণ অর্ডার
                 </div>
-                <div className="text-3xl font-bold text-white mb-1">
+                <div className="text-3xl font-extrabold text-white mb-1">
                   {dashboardData.pendingOrders}
                 </div>
-                <div className="text-white text-opacity-90 text-xs">
+                <div className="text-white text-opacity-80 text-xs font-medium">
                   প্রক্রিয়াধীন
                 </div>
               </div>
-              <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+              <div className="w-14 h-14 bg-white bg-opacity-25 rounded-xl flex items-center justify-center shadow-lg ml-3 flex-shrink-0">
                 <ShoppingCartOutlined className="text-2xl text-white" />
               </div>
             </div>
-            <div className="flex items-center mt-3">
+            <div className="flex items-center mt-4 pt-3 border-t border-white border-opacity-20">
               <Progress
                 percent={
                   Math.round(
@@ -1029,6 +1054,7 @@ const DashboardHome = () => {
                 strokeColor="#ffffff"
                 trailColor="rgba(255,255,255,0.3)"
                 showInfo={false}
+                className="w-full"
               />
             </div>
           </Card>
@@ -1036,31 +1062,35 @@ const DashboardHome = () => {
       </Row>
 
       {/* Net Profit Metrics (Profit - Expenses) */}
-      <Row gutter={[20, 20]}>
-        <Col xs={24} sm={12} md={8}>
+      <Row gutter={[16, 16]}>
+        <Col xs={24} sm={12} md={8} lg={8} xl={8}>
           <Card
-            className="border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:-translate-y-1"
+            className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 h-full"
             bodyStyle={{
-              background: cardColors.teal,
-              borderRadius: "12px",
+              background: `linear-gradient(135deg, ${cardColors.teal} 0%, #0d9488 100%)`,
+              borderRadius: "16px",
               padding: "24px",
               color: "white",
+              minHeight: "160px",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
             }}
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-white text-opacity-80 text-sm font-medium mb-2">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="text-white text-opacity-90 text-xs font-semibold mb-2 uppercase tracking-wide">
                   দৈনিক নিট লাভ
                 </div>
-                <div className="text-2xl font-bold text-white mb-1">
+                <div className="text-2xl font-extrabold text-white mb-1">
                   {dashboardData.dailyNetProfit?.toLocaleString()} ৳
                 </div>
-                <div className="text-white text-opacity-90 text-xs">
+                <div className="text-white text-opacity-80 text-xs font-medium">
                   (লাভ - খরচ)
                 </div>
               </div>
-              <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                <RiseOutlined className="text-2xl text-white" />
+              <div className="w-14 h-14 bg-white bg-opacity-25 rounded-xl flex items-center justify-center shadow-lg ml-3 flex-shrink-0">
+                <ThunderboltOutlined className="text-2xl text-white" />
               </div>
             </div>
             <div className="flex items-center justify-between mt-3 text-xs">
@@ -1074,29 +1104,33 @@ const DashboardHome = () => {
           </Card>
         </Col>
 
-        <Col xs={24} sm={12} md={8}>
+        <Col xs={24} sm={12} md={8} lg={8} xl={8}>
           <Card
-            className="border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:-translate-y-1"
+            className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 h-full"
             bodyStyle={{
-              background: cardColors.pink,
-              borderRadius: "12px",
+              background: `linear-gradient(135deg, ${cardColors.pink} 0%, #db2777 100%)`,
+              borderRadius: "16px",
               padding: "24px",
               color: "white",
+              minHeight: "160px",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
             }}
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-white text-opacity-80 text-sm font-medium mb-2">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="text-white text-opacity-90 text-xs font-semibold mb-2 uppercase tracking-wide">
                   মাসিক নিট লাভ
                 </div>
-                <div className="text-2xl font-bold text-white mb-1">
+                <div className="text-2xl font-extrabold text-white mb-1">
                   {dashboardData.monthlyNetProfit?.toLocaleString()} ৳
                 </div>
-                <div className="text-white text-opacity-90 text-xs">
+                <div className="text-white text-opacity-80 text-xs font-medium">
                   (লাভ - খরচ)
                 </div>
               </div>
-              <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+              <div className="w-14 h-14 bg-white bg-opacity-25 rounded-xl flex items-center justify-center shadow-lg ml-3 flex-shrink-0">
                 <BarChartOutlined className="text-2xl text-white" />
               </div>
             </div>
@@ -1111,30 +1145,34 @@ const DashboardHome = () => {
           </Card>
         </Col>
 
-        <Col xs={24} sm={12} md={8}>
+        <Col xs={24} sm={12} md={8} lg={8} xl={8}>
           <Card
-            className="border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:-translate-y-1"
+            className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 h-full"
             bodyStyle={{
-              background: cardColors.orange,
-              borderRadius: "12px",
+              background: `linear-gradient(135deg, ${cardColors.orange} 0%, #ea580c 100%)`,
+              borderRadius: "16px",
               padding: "24px",
               color: "white",
+              minHeight: "160px",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
             }}
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-white text-opacity-80 text-sm font-medium mb-2">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="text-white text-opacity-90 text-xs font-semibold mb-2 uppercase tracking-wide">
                   বার্ষিক নিট লাভ
                 </div>
-                <div className="text-2xl font-bold text-white mb-1">
+                <div className="text-2xl font-extrabold text-white mb-1">
                   {dashboardData.yearlyNetProfit?.toLocaleString()} ৳
                 </div>
-                <div className="text-white text-opacity-90 text-xs">
+                <div className="text-white text-opacity-80 text-xs font-medium">
                   (লাভ - খরচ)
                 </div>
               </div>
-              <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                <CalculatorOutlined className="text-2xl text-white" />
+              <div className="w-14 h-14 bg-white bg-opacity-25 rounded-xl flex items-center justify-center shadow-lg ml-3 flex-shrink-0">
+                <CalendarOutlined className="text-2xl text-white" />
               </div>
             </div>
             <div className="flex items-center justify-between mt-3 text-xs">
@@ -1150,31 +1188,35 @@ const DashboardHome = () => {
       </Row>
 
       {/* Expense Metrics */}
-      <Row gutter={[20, 20]}>
-        <Col xs={24} sm={12} md={8}>
+      <Row gutter={[16, 16]}>
+        <Col xs={24} sm={12} md={8} lg={8} xl={8}>
           <Card
-            className="border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:-translate-y-1"
+            className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 h-full"
             bodyStyle={{
-              background: cardColors.red,
-              borderRadius: "12px",
+              background: `linear-gradient(135deg, ${cardColors.red} 0%, #dc2626 100%)`,
+              borderRadius: "16px",
               padding: "24px",
               color: "white",
+              minHeight: "160px",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
             }}
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-white text-opacity-80 text-sm font-medium mb-2">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="text-white text-opacity-90 text-xs font-semibold mb-2 uppercase tracking-wide">
                   দৈনিক খরচ
                 </div>
-                <div className="text-2xl font-bold text-white mb-1">
+                <div className="text-2xl font-extrabold text-white mb-1">
                   {dashboardData.dailyExpenses?.toLocaleString()} ৳
                 </div>
-                <div className="text-white text-opacity-90 text-xs">
+                <div className="text-white text-opacity-80 text-xs font-medium">
                   আজকের মোট খরচ
                 </div>
               </div>
-              <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                <MoneyCollectOutlined className="text-2xl text-white" />
+              <div className="w-14 h-14 bg-white bg-opacity-25 rounded-xl flex items-center justify-center shadow-lg ml-3 flex-shrink-0">
+                <WalletOutlined className="text-2xl text-white" />
               </div>
             </div>
             <div className="flex items-center mt-3">
@@ -1186,30 +1228,34 @@ const DashboardHome = () => {
           </Card>
         </Col>
 
-        <Col xs={24} sm={12} md={8}>
+        <Col xs={24} sm={12} md={8} lg={8} xl={8}>
           <Card
-            className="border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:-translate-y-1"
+            className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 h-full"
             bodyStyle={{
-              background: cardColors.rose,
-              borderRadius: "12px",
+              background: `linear-gradient(135deg, ${cardColors.rose} 0%, #e11d48 100%)`,
+              borderRadius: "16px",
               padding: "24px",
               color: "white",
+              minHeight: "160px",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
             }}
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-white text-opacity-80 text-sm font-medium mb-2">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="text-white text-opacity-90 text-xs font-semibold mb-2 uppercase tracking-wide">
                   মাসিক খরচ
                 </div>
-                <div className="text-2xl font-bold text-white mb-1">
+                <div className="text-2xl font-extrabold text-white mb-1">
                   {dashboardData.monthlyExpenses?.toLocaleString()} ৳
                 </div>
-                <div className="text-white text-opacity-90 text-xs">
+                <div className="text-white text-opacity-80 text-xs font-medium">
                   এই মাসের মোট খরচ
                 </div>
               </div>
-              <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                <MoneyCollectOutlined className="text-2xl text-white" />
+              <div className="w-14 h-14 bg-white bg-opacity-25 rounded-xl flex items-center justify-center shadow-lg ml-3 flex-shrink-0">
+                <BankOutlined className="text-2xl text-white" />
               </div>
             </div>
             <div className="flex items-center mt-3">
@@ -1221,30 +1267,34 @@ const DashboardHome = () => {
           </Card>
         </Col>
 
-        <Col xs={24} sm={12} md={8}>
+        <Col xs={24} sm={12} md={8} lg={8} xl={8}>
           <Card
-            className="border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:-translate-y-1"
+            className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 h-full"
             bodyStyle={{
-              background: cardColors.indigo,
-              borderRadius: "12px",
+              background: `linear-gradient(135deg, ${cardColors.indigo} 0%, #4f46e5 100%)`,
+              borderRadius: "16px",
               padding: "24px",
               color: "white",
+              minHeight: "160px",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
             }}
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-white text-opacity-80 text-sm font-medium mb-2">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="text-white text-opacity-90 text-xs font-semibold mb-2 uppercase tracking-wide">
                   বার্ষিক খরচ
                 </div>
-                <div className="text-2xl font-bold text-white mb-1">
+                <div className="text-2xl font-extrabold text-white mb-1">
                   {dashboardData.yearlyExpenses?.toLocaleString()} ৳
                 </div>
-                <div className="text-white text-opacity-90 text-xs">
+                <div className="text-white text-opacity-80 text-xs font-medium">
                   এই বছরের মোট খরচ
                 </div>
               </div>
-              <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                <MoneyCollectOutlined className="text-2xl text-white" />
+              <div className="w-14 h-14 bg-white bg-opacity-25 rounded-xl flex items-center justify-center shadow-lg ml-3 flex-shrink-0">
+                <FileTextOutlined className="text-2xl text-white" />
               </div>
             </div>
             <div className="flex items-center mt-3">

@@ -153,13 +153,53 @@ const OrderEntry = () => {
 
   const fetchProductsByCategory = async (categoryCode) => {
     try {
+      // Reset product selection when category changes
+      addOrderForm.setFieldsValue({
+        productId: undefined,
+        productName: "",
+        unitPrice: undefined,
+        salePrice: undefined,
+        quantity: 1,
+        availableQuantity: undefined,
+      });
+      
       const response = await coreAxios.get(
         `/products/category/${categoryCode}`
       );
-      setProducts(response.data?.products || []);
+      
+      const productsData = response.data?.products || response.data || [];
+      
+      // Normalize product data - prioritize _id as primary identifier
+      const normalizedProducts = productsData.map((product) => {
+        // Use _id as primary identifier, fallback to productId or id
+        const primaryId = product._id || product.productId || product.id;
+        
+        if (!primaryId) {
+          console.warn("Product missing ID:", product);
+        }
+        
+        return {
+          ...product,
+          _id: primaryId, // Ensure _id exists as primary identifier
+          productId: product.productId || primaryId, // Keep productId for backward compatibility
+        };
+      }).filter(product => product._id); // Remove products without _id
+      
+      console.log("Fetched Products (using _id):", {
+        categoryCode,
+        count: normalizedProducts.length,
+        products: normalizedProducts.map(p => ({
+          _id: p._id,
+          productId: p.productId,
+          name: p.productName
+        }))
+      });
+      
+      setProducts(normalizedProducts);
     } catch (error) {
       console.error("Error fetching products:", error);
       message.error("পণ্য লোড করতে সমস্যা হয়েছে");
+      setProducts([]);
     }
   };
 
@@ -169,10 +209,31 @@ const OrderEntry = () => {
       const response = await coreAxios.get("/productOrders");
       if (response.data.success) {
         setOrders(response.data.data || []);
+      } else {
+        setOrders([]);
       }
     } catch (error) {
       console.error("Error fetching orders:", error);
       message.error("অর্ডার লোড করতে সমস্যা হয়েছে");
+      setOrders([]);
+    }
+  };
+
+  // Refresh all data
+  const handleRefresh = async () => {
+    try {
+      setLoading(true);
+      await Promise.all([
+        fetchOrders(),
+        fetchFinancialSummary(),
+        fetchCategories(),
+      ]);
+      message.success("ডেটা সফলভাবে রিফ্রেশ করা হয়েছে!");
+    } catch (error) {
+      console.error("Error refreshing data:", error);
+      message.error("ডেটা রিফ্রেশ করতে সমস্যা হয়েছে");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -704,18 +765,47 @@ const OrderEntry = () => {
     }
   };
 
-  const handleProductSelect = (productId) => {
-    const selectedProduct = products.find(
-      (product) => product.productId === productId
-    );
-    if (selectedProduct) {
+  const handleProductSelect = (selectedId) => {
+    if (!selectedId) {
+      // Clear form if no product selected
       addOrderForm.setFieldsValue({
+        productId: undefined,
+        productName: "",
+        unitPrice: undefined,
+        salePrice: undefined,
+        quantity: 1,
+        availableQuantity: undefined,
+      });
+      return;
+    }
+
+    // Find the product by _id (primary identifier)
+    const selectedProduct = products.find((product) => {
+      // Match by _id first (primary identifier)
+      return product._id === selectedId || 
+             String(product._id) === String(selectedId);
+    });
+    
+    if (selectedProduct && selectedProduct._id) {
+      // Use _id as the primary identifier
+      const productId = selectedProduct._id;
+      
+      console.log("✅ Product Selected (using _id):", {
+        selectedId: selectedId,
+        productId: productId,
         productName: selectedProduct.productName,
-        category: selectedProduct.category,
+        product: selectedProduct
+      });
+      
+      // Set form values - use _id for productId field
+      addOrderForm.setFieldsValue({
+        productId: productId, // Store _id in productId field
+        productName: selectedProduct.productName,
+        category: selectedProduct.category || selectedProduct.categoryName || selectedProduct.categoryCode,
         unitPrice: selectedProduct.unitPrice,
         salePrice: selectedProduct.unitPrice,
         quantity: 1,
-        availableQuantity: selectedProduct.quantity || 100,
+        availableQuantity: selectedProduct.quantity || selectedProduct.qty || 100,
         orderDate: dayjs(),
         paymentMethod: "Cash",
         paidAmount: 0,
@@ -723,6 +813,24 @@ const OrderEntry = () => {
 
       // Calculate totalAmount and dueAmount after setting form values
       calculateTotalAndDueAmount(addOrderForm);
+      
+      // Verify the form value was set correctly
+      const formProductId = addOrderForm.getFieldValue('productId');
+      if (formProductId !== productId) {
+        console.warn("Form value mismatch, forcing update...");
+        addOrderForm.setFieldValue('productId', productId);
+      }
+    } else {
+      console.error("❌ Product not found:", {
+        searchedId: selectedId,
+        type: typeof selectedId,
+        availableProducts: products.map(p => ({
+          _id: p._id,
+          productId: p.productId,
+          name: p.productName
+        }))
+      });
+      message.error(`পণ্য খুঁজে পাওয়া যায়নি (ID: ${selectedId})`);
     }
   };
 
@@ -1100,10 +1208,11 @@ const OrderEntry = () => {
               সকল অর্ডার
             </Title>
             <Button
-              onClick={fetchOrders}
+              onClick={handleRefresh}
               icon={<ReloadOutlined />}
               loading={loading}
               className="rounded-lg mb-2"
+              type="default"
             >
               রিফ্রেশ
             </Button>
@@ -1124,7 +1233,11 @@ const OrderEntry = () => {
         <Modal
           title="নতুন অর্ডার যোগ করুন"
           open={addOrderModalVisible}
-          onCancel={() => setAddOrderModalVisible(false)}
+          onCancel={() => {
+            addOrderForm.resetFields();
+            setProducts([]);
+            setAddOrderModalVisible(false);
+          }}
           footer={null}
           width={700}
           className="rounded-lg"
@@ -1180,16 +1293,26 @@ const OrderEntry = () => {
                       onChange={fetchProductsByCategory}
                       size="large"
                       showSearch
-                      filterOption={(input, option) =>
-                        String(option?.children || "")
+                      allowClear
+                      optionFilterProp="children"
+                      filterOption={(input, option) => {
+                        const label = option?.children || option?.label || "";
+                        return String(label)
                           .toLowerCase()
-                          .includes(input.toLowerCase())
+                          .includes(input.toLowerCase());
+                      }}
+                      notFoundContent={
+                        <div className="text-center py-2 text-gray-500">
+                          কোন ক্যাটাগরি পাওয়া যায়নি
+                        </div>
                       }
+                      className="w-full"
                     >
                       {categories.map((category) => (
                         <Option
                           key={category.categoryCode}
                           value={category.categoryCode}
+                          label={category.categoryName}
                         >
                           {category.categoryName}
                         </Option>
@@ -1207,27 +1330,74 @@ const OrderEntry = () => {
                       placeholder="পণ্য নির্বাচন করুন"
                       size="large"
                       showSearch
-                      onChange={handleProductSelect}
-                      filterOption={(input, option) => {
-                        const children = option?.children;
-                        if (typeof children === "string") {
-                          return children
-                            .toLowerCase()
-                            .includes(input.toLowerCase());
+                      allowClear
+                      optionFilterProp="label"
+                      onChange={(value) => {
+                        console.log("Product dropdown onChange:", value);
+                        if (value) {
+                          handleProductSelect(value);
+                        } else {
+                          // Clear form when selection is cleared
+                          addOrderForm.setFieldsValue({
+                            productId: undefined,
+                            productName: "",
+                            unitPrice: undefined,
+                            salePrice: undefined,
+                            quantity: 1,
+                            availableQuantity: undefined,
+                          });
                         }
-                        return String(children || "")
+                      }}
+                      disabled={!products || products.length === 0}
+                      filterOption={(input, option) => {
+                        const label = option?.label || option?.children || "";
+                        return String(label)
                           .toLowerCase()
                           .includes(input.toLowerCase());
                       }}
+                      notFoundContent={
+                        <div className="text-center py-2 text-gray-500">
+                          {products.length === 0 
+                            ? "প্রথমে ক্যাটাগরি নির্বাচন করুন" 
+                            : "কোন পণ্য পাওয়া যায়নি"}
+                        </div>
+                      }
+                      className="w-full"
+                      getPopupContainer={(triggerNode) => triggerNode.parentElement}
                     >
-                      {products.map((product) => (
-                        <Option
-                          key={product.productId}
-                          value={product.productId}
-                        >
-                          {product.productName} - ৳{product.unitPrice}
-                        </Option>
-                      ))}
+                      {products.map((product, index) => {
+                        // Use _id as the primary identifier for dropdown value
+                        const productId = product._id;
+                        
+                        if (!productId) {
+                          console.warn("Product missing _id:", product);
+                          return null;
+                        }
+                        
+                        // Create a unique key using _id
+                        const uniqueKey = `product-${productId}-${index}`;
+                        
+                        return (
+                          <Option
+                            key={uniqueKey}
+                            value={productId} // Use _id as the value
+                            label={`${product.productName} - ৳${product.unitPrice}`}
+                            title={product.productName}
+                          >
+                            <div className="flex justify-between items-center">
+                              <span className="font-medium">{product.productName}</span>
+                              <span className="text-blue-600 font-semibold ml-2">
+                                ৳{product.unitPrice}
+                              </span>
+                              {(product.qty !== undefined || product.quantity !== undefined) && (
+                                <span className="text-xs text-gray-500 ml-2">
+                                  (স্টক: {product.qty || product.quantity})
+                                </span>
+                              )}
+                            </div>
+                          </Option>
+                        );
+                      }).filter(Boolean)}
                     </Select>
                   </Form.Item>
                 </Col>
@@ -1395,7 +1565,11 @@ const OrderEntry = () => {
                 </Text>
               </div>
               <Button
-                onClick={() => setAddOrderModalVisible(false)}
+                onClick={() => {
+                  addOrderForm.resetFields();
+                  setProducts([]);
+                  setAddOrderModalVisible(false);
+                }}
                 className="mr-2 rounded-lg"
                 size="large"
               >
@@ -1674,15 +1848,55 @@ const OrderEntry = () => {
                     ]}
                   >
                     <Select
-                      placeholder="পেমেন্ট মেথড"
+                      placeholder="পেমেন্ট মেথড নির্বাচন করুন"
                       size="large"
+                      showSearch
+                      allowClear
+                      optionFilterProp="children"
+                      filterOption={(input, option) => {
+                        const label = option?.children || option?.label || "";
+                        return String(label)
+                          .toLowerCase()
+                          .includes(input.toLowerCase());
+                      }}
+                      className="w-full"
                     >
-                      <Option value="Cash">Cash</Option>
-                      <Option value="Card">Card</Option>
-                      <Option value="Mobile Banking">Mobile Banking</Option>
-                      <Option value="Bank Transfer">Bank Transfer</Option>
-                      <Option value="Due">Due</Option>
-                      <Option value="Partial">Partial</Option>
+                      <Option value="Cash" label="Cash">
+                        <div className="flex items-center">
+                          <CreditCardOutlined className="mr-2" />
+                          <span>Cash (নগদ)</span>
+                        </div>
+                      </Option>
+                      <Option value="Card" label="Card">
+                        <div className="flex items-center">
+                          <CreditCardOutlined className="mr-2" />
+                          <span>Card (কার্ড)</span>
+                        </div>
+                      </Option>
+                      <Option value="Mobile Banking" label="Mobile Banking">
+                        <div className="flex items-center">
+                          <CreditCardOutlined className="mr-2" />
+                          <span>Mobile Banking (মোবাইল ব্যাংকিং)</span>
+                        </div>
+                      </Option>
+                      <Option value="Bank Transfer" label="Bank Transfer">
+                        <div className="flex items-center">
+                          <CreditCardOutlined className="mr-2" />
+                          <span>Bank Transfer (ব্যাংক ট্রান্সফার)</span>
+                        </div>
+                      </Option>
+                      <Option value="Due" label="Due">
+                        <div className="flex items-center">
+                          <DollarOutlined className="mr-2" />
+                          <span>Due (বাকি)</span>
+                        </div>
+                      </Option>
+                      <Option value="Partial" label="Partial">
+                        <div className="flex items-center">
+                          <DollarOutlined className="mr-2" />
+                          <span>Partial (আংশিক)</span>
+                        </div>
+                      </Option>
                     </Select>
                   </Form.Item>
                 </Col>
@@ -1714,11 +1928,32 @@ const OrderEntry = () => {
               <Row gutter={16}>
                 <Col xs={24} md={12}>
                   <Form.Item name="status" label="স্ট্যাটাস">
-                    <Select size="large">
-                      <Option value="Pending">Pending</Option>
-                      <Option value="Processing">Processing</Option>
-                      <Option value="Completed">Completed</Option>
-                      <Option value="Cancelled">Cancelled</Option>
+                    <Select 
+                      size="large"
+                      showSearch
+                      allowClear
+                      optionFilterProp="children"
+                      placeholder="স্ট্যাটাস নির্বাচন করুন"
+                      filterOption={(input, option) => {
+                        const label = option?.children || option?.label || "";
+                        return String(label)
+                          .toLowerCase()
+                          .includes(input.toLowerCase());
+                      }}
+                      className="w-full"
+                    >
+                      <Option value="Pending" label="Pending">
+                        <Tag color="orange">Pending</Tag>
+                      </Option>
+                      <Option value="Processing" label="Processing">
+                        <Tag color="blue">Processing</Tag>
+                      </Option>
+                      <Option value="Completed" label="Completed">
+                        <Tag color="green">Completed</Tag>
+                      </Option>
+                      <Option value="Cancelled" label="Cancelled">
+                        <Tag color="red">Cancelled</Tag>
+                      </Option>
                     </Select>
                   </Form.Item>
                 </Col>
@@ -1958,15 +2193,55 @@ const OrderEntry = () => {
                       ]}
                     >
                       <Select
-                        placeholder="পেমেন্ট মেথড"
+                        placeholder="পেমেন্ট মেথড নির্বাচন করুন"
                         size="large"
+                        showSearch
+                        allowClear
+                        optionFilterProp="children"
+                        filterOption={(input, option) => {
+                          const label = option?.children || option?.label || "";
+                          return String(label)
+                            .toLowerCase()
+                            .includes(input.toLowerCase());
+                        }}
+                        className="w-full"
                       >
-                        <Option value="Cash">Cash</Option>
-                        <Option value="Card">Card</Option>
-                        <Option value="Mobile Banking">Mobile Banking</Option>
-                        <Option value="Bank Transfer">Bank Transfer</Option>
-                        <Option value="Due">Due</Option>
-                        <Option value="Partial">Partial</Option>
+                        <Option value="Cash" label="Cash">
+                          <div className="flex items-center">
+                            <CreditCardOutlined className="mr-2" />
+                            <span>Cash (নগদ)</span>
+                          </div>
+                        </Option>
+                        <Option value="Card" label="Card">
+                          <div className="flex items-center">
+                            <CreditCardOutlined className="mr-2" />
+                            <span>Card (কার্ড)</span>
+                          </div>
+                        </Option>
+                        <Option value="Mobile Banking" label="Mobile Banking">
+                          <div className="flex items-center">
+                            <CreditCardOutlined className="mr-2" />
+                            <span>Mobile Banking (মোবাইল ব্যাংকিং)</span>
+                          </div>
+                        </Option>
+                        <Option value="Bank Transfer" label="Bank Transfer">
+                          <div className="flex items-center">
+                            <CreditCardOutlined className="mr-2" />
+                            <span>Bank Transfer (ব্যাংক ট্রান্সফার)</span>
+                          </div>
+                        </Option>
+                        <Option value="Due" label="Due">
+                          <div className="flex items-center">
+                            <DollarOutlined className="mr-2" />
+                            <span>Due (বাকি)</span>
+                          </div>
+                        </Option>
+                        <Option value="Partial" label="Partial">
+                          <div className="flex items-center">
+                            <DollarOutlined className="mr-2" />
+                            <span>Partial (আংশিক)</span>
+                          </div>
+                        </Option>
                       </Select>
                     </Form.Item>
                   </Col>
