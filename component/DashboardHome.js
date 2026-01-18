@@ -854,15 +854,33 @@ const DashboardHome = () => {
   const getCurrentDateInfo = () => {
     const today = new Date();
     const currentDay = today.getDate();
-    const currentMonth = today.toLocaleDateString('bn-BD', { month: 'long' });
+    const currentMonth = today.getMonth();
     const currentYear = today.getFullYear();
+    
+    // Get next month info
+    const nextMonth = new Date(currentYear, currentMonth + 1, 1);
+    const nextMonthName = nextMonth.toLocaleDateString('bn-BD', { month: 'long' });
+    const nextMonthYear = nextMonth.getFullYear();
+    
+    // Calculate days until next month's 15th
+    const nextMonth15 = new Date(currentYear, currentMonth + 1, 15);
+    const daysUntilNextMonth15 = Math.ceil((nextMonth15 - today) / (1000 * 60 * 60 * 24));
+    
+    // Warning period: 10-15 of next month (show warning 5 days before)
+    const isWarningPeriod = daysUntilNextMonth15 >= 0 && daysUntilNextMonth15 <= 5;
+    
+    // Block after next month's 15th
+    const isBlocked = today > nextMonth15;
     
     return {
       day: currentDay,
-      month: currentMonth,
+      month: today.toLocaleDateString('bn-BD', { month: 'long' }),
       year: currentYear,
-      isWarningPeriod: currentDay >= 10 && currentDay <= 15,
-      isBlocked: currentDay > 15,
+      nextMonthName: nextMonthName,
+      nextMonthYear: nextMonthYear,
+      daysUntilNextMonth15: daysUntilNextMonth15,
+      isWarningPeriod: isWarningPeriod,
+      isBlocked: false, // Disabled - always allow access
     };
   };
 
@@ -885,61 +903,61 @@ const DashboardHome = () => {
     );
   }
 
-  // Block access after 10th if bill not paid
-  if (dateInfo.isBlocked) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Card className="max-w-2xl w-full border-0 shadow-2xl">
-          <div className="text-center py-8">
-            <div className="mb-6">
-              <StopOutlined className="text-6xl text-red-500 mb-4" />
-            </div>
-            <Alert
-              message={
-                <div className="text-center">
-                  <Typography.Title level={3} className="text-red-600 mb-2">
-                    <ExclamationCircleOutlined className="mr-2" />
-                    সার্ভার বিল পরিশোধ করুন
-                  </Typography.Title>
-                  <Typography.Text className="text-lg block mb-4">
-                    দুঃখিত, আপনার সার্ভার বিল পরিশোধ করা হয়নি
-                  </Typography.Text>
-                  <Typography.Text className="text-base text-gray-600 block">
-                    ড্যাশবোর্ড অ্যাক্সেস করতে হলে প্রথমে সার্ভার বিল পরিশোধ করুন
-                  </Typography.Text>
-                  <Typography.Text className="text-sm text-gray-500 block mt-4">
-                    তারিখ: {dateInfo.day} {dateInfo.month}, {dateInfo.year}
-                  </Typography.Text>
-                </div>
-              }
-              type="error"
-              showIcon={false}
-              className="border-2 border-red-300 rounded-xl"
-              style={{
-                backgroundColor: '#fef2f2',
-                padding: '30px',
-              }}
-            />
-            <div className="mt-6">
-              <Button
-                type="primary"
-                size="large"
-                icon={<WalletOutlined />}
-                className="bg-gradient-to-r from-red-500 to-red-600 border-0 shadow-lg hover:shadow-xl"
-                onClick={() => window.location.reload()}
-              >
-                পৃষ্ঠা রিফ্রেশ করুন
-              </Button>
-            </div>
-          </div>
-        </Card>
-      </div>
-    );
-  }
+  // Blocking functionality disabled - dashboard always accessible
+  // if (dateInfo.isBlocked) {
+  //   return (
+  //     <div className="flex items-center justify-center min-h-[60vh]">
+  //       <Card className="max-w-2xl w-full border-0 shadow-2xl">
+  //         <div className="text-center py-8">
+  //           <div className="mb-6">
+  //             <StopOutlined className="text-6xl text-red-500 mb-4" />
+  //           </div>
+  //           <Alert
+  //             message={
+  //               <div className="text-center">
+  //                 <Typography.Title level={3} className="text-red-600 mb-2">
+  //                   <ExclamationCircleOutlined className="mr-2" />
+  //                   সার্ভার বিল পরিশোধ করুন
+  //                 </Typography.Title>
+  //                 <Typography.Text className="text-lg block mb-4">
+  //                   দুঃখিত, আপনার সার্ভার বিল পরিশোধ করা হয়নি
+  //                 </Typography.Text>
+  //                 <Typography.Text className="text-base text-gray-600 block">
+  //                   ড্যাশবোর্ড অ্যাক্সেস করতে হলে প্রথমে সার্ভার বিল পরিশোধ করুন
+  //                 </Typography.Text>
+  //                 <Typography.Text className="text-sm text-gray-500 block mt-4">
+  //                   তারিখ: {dateInfo.day} {dateInfo.month}, {dateInfo.year}
+  //                 </Typography.Text>
+  //               </div>
+  //             }
+  //             type="error"
+  //             showIcon={false}
+  //             className="border-2 border-red-300 rounded-xl"
+  //             style={{
+  //               backgroundColor: '#fef2f2',
+  //               padding: '30px',
+  //             }}
+  //           />
+  //           <div className="mt-6">
+  //             <Button
+  //               type="primary"
+  //               size="large"
+  //               icon={<WalletOutlined />}
+  //               className="bg-gradient-to-r from-red-500 to-red-600 border-0 shadow-lg hover:shadow-xl"
+  //               onClick={() => window.location.reload()}
+  //             >
+  //               পৃষ্ঠা রিফ্রেশ করুন
+  //             </Button>
+  //           </div>
+  //         </div>
+  //       </Card>
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="space-y-6">
-      {/* Server Bill Payment Warning (1-10 of month) */}
+      {/* Server Bill Payment Warning (10-15 of next month) */}
       {dateInfo.isWarningPeriod && (
         <Alert
           message={
@@ -951,8 +969,10 @@ const DashboardHome = () => {
                     সার্ভার বিল পরিশোধের সময়
                   </Typography.Text>
                   <Typography.Text className="text-sm text-gray-700">
-                    অনুগ্রহ করে {dateInfo.month} মাসের সার্ভার বিলের বাকি পরিমাণ পরিশোধ করুন। 
-                    {dateInfo.day < 15 ? ` এখনও ${15 - dateInfo.day} দিন বাকি আছে।` : ' আজই পরিশোধ করুন।'}
+                    অনুগ্রহ করে {dateInfo.nextMonthName} মাসের সার্ভার বিলের বাকি পরিমাণ পরিশোধ করুন। 
+                    {dateInfo.daysUntilNextMonth15 > 0 
+                      ? ` এখনও ${dateInfo.daysUntilNextMonth15} দিন বাকি আছে (${dateInfo.nextMonthName} ${dateInfo.nextMonthYear})।` 
+                      : ` আজই পরিশোধ করুন (${dateInfo.nextMonthName} ${dateInfo.nextMonthYear})।`}
                   </Typography.Text>
                 </div>
               </div>
